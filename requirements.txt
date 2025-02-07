@@ -1,0 +1,10 @@
+ccxt
+pandas
+numpy
+TA-Lib
+websocket
+colorama
+matplotlib
+schedule
+telethon>=1.38.1
+pymongo

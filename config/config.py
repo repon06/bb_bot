@@ -12,8 +12,8 @@ API_KEYS = {
 }
 
 # API ID и API Hash на https://my.telegram.org/auth
-tg_api_id = '24111402'
-tg_api_hash = '8baeeb87d31ca8d73295a663f096c3aa'
+tg_api_id = ''
+tg_api_hash = ''
 tg_channel_name = '@MYH_System'  # имя канала
 session_name = 'session_name'
 

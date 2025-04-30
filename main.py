@@ -205,8 +205,8 @@ def main():
 
 if __name__ == "__main__":
     main()
-    schedule.every(60).seconds.do(main)  # Запускать main каждые 60 секунд
+    schedule.every(60).seconds.do(main)
 
     while True:
         schedule.run_pending()
-        time.sleep(1)  # Проверка задач каждые 1 сек
+        time.sleep(1)

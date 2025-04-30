@@ -1,7 +1,12 @@
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
 API_KEYS = {
     "demo": {
-        "API_KEY": "v0unD4I4FfynY10Hl1",
-        "API_SECRET": "dmBztY3WFwaR8fkm5Of95bPaRAh2J65399FO",
+        "API_KEY": os.getenv("API_KEY"),
+        "API_SECRET": os.getenv("API_SECRET"),
         "BASE_URL": "https://api-demo.bybit.com",
     },
     "real": {
@@ -12,8 +17,8 @@ API_KEYS = {
 }
 
 # API ID и API Hash на https://my.telegram.org/auth
-tg_api_id = ''
-tg_api_hash = ''
+tg_api_id = os.getenv("TG_API_ID")
+tg_api_hash = os.getenv("TG_API_HASH")
 tg_channel_name = '@MYH_System'  # имя канала
 session_name = 'session_name'
 

@@ -6,7 +6,7 @@ import re
 from telethon import TelegramClient
 from telethon.errors import ChannelPrivateError, UsernameInvalidError
 
-from config import session_name, tg_api_id, tg_api_hash, tg_channel_name
+from config import session_name, tg_api_id, tg_api_hash, tg_channel_name, session_insider_account
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
@@ -57,15 +57,26 @@ async def get_tg_signal(limit=100):
 
 async def get_tg_signals_from_insider_trade(limit=100):
     signals = []
-    if os.path.exists(f"{session_name}.session"):
+    if os.path.exists(f"{session_insider_account}.session"):
         logging.info("Сессия найдена, используем сохраненную.")
     else:
         logging.info("Сессия не найдена, потребуется авторизация.")
 
-    async with TelegramClient(session_name, tg_api_id, tg_api_hash,
+    async with TelegramClient(session_insider_account, tg_api_id, tg_api_hash,
                               system_version='1.38.1',
                               device_model='xiaomi',
                               app_version='1.38.1') as client:
+
+        dialogs = await client.get_dialogs()
+
+        channels = [d for d in dialogs if d.is_channel]
+        if not channels:
+            print("Каналы не найдены в вашем аккаунте.")
+            return None
+
+        print("\n📋 Найденные каналы:")
+        for i, dialog in enumerate(channels):
+            print(f"{i + 1}. {dialog.title} (id: {dialog.id})")
 
         try:
             channel = await client.get_entity('@Insider_Trade')

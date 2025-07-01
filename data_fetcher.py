@@ -3,7 +3,7 @@ from typing import Optional
 
 import ccxt
 
-from config.config import IS_DEMO, LOGGING, DELTA, LEVERAGE, SYMBOLS, debug_enable
+from config import IS_DEMO, LOGGING, DELTA, LEVERAGE, SYMBOLS, debug_enable
 from helper.calculate import calculate_support_resistance, \
     calculate_take_profit_using_resistance, calculate_ema_take_profit, calculate_take_profit_using_atr, \
     calculate_fibonacci_levels, calculate_dynamic_take_profit, calculate_combined_take_profits, calculate_volatility, \

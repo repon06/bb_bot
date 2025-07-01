@@ -1,3 +1,4 @@
+from datetime import datetime
 import re
 
 
@@ -61,7 +62,8 @@ def parse_trade_signal(signal_text):
             'symbol': symbol,
             'buy_price': buy_price,
             'take_profits': take_profits,
-            'stop_loss': stop_loss
+            'stop_loss': stop_loss,
+            'date': datetime.now().date()
         }
 
     except Exception as e:

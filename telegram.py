@@ -5,13 +5,14 @@ import re
 
 from telethon import TelegramClient
 
-from config.config import session_name, tg_api_id, tg_api_hash, tg_channel_name
+from config import session_name, tg_api_id, tg_api_hash, tg_channel_name
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
 
 # Регулярное выражение для парсинга сообщения с сигналом
 signal_pattern = r"⚡.*?New Signal\s#([\w-]+)\s+.*\n\s*`?\s*Buy:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP1:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP2:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP3:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP4:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP5:\s*`?\s*([\d.]+)\s*\n\s*`?\s*STL:\s*`?\s*([\d.]+)"
+#TODO: поменялся формат с 20/06/2025?
 
 async def get_tg_signal(limit=100):
     signals = []

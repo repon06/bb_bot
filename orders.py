@@ -5,8 +5,7 @@ import array
 import ccxt
 import math
 
-import config.config
-from config.config import LEVERAGE
+from config import LEVERAGE, TRADE_AMOUNT
 from helper.calculate import determine_trade_type
 from helper.design import red, green, yellow
 from helper.json_helper import get_error
@@ -440,7 +439,7 @@ def open_order_with_tps_sl(exchange, market_symbol, buy_price, take_profits, sto
         market_info = exchange.market(market_symbol)
         min_order_size = market_info['limits']['amount']['min']
 
-        order_amount = config.config.TRADE_AMOUNT / current_price
+        order_amount = TRADE_AMOUNT / current_price
         if order_amount < min_order_size:
             print(f"Количество ордера {order_amount} меньше минимально допустимого {min_order_size}.")
             return []

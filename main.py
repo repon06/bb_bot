@@ -7,8 +7,8 @@ import schedule
 
 import orders
 import telegram
-from config.config import API_KEYS, IS_DEMO, TIMEFRAME, LEVERAGE, TIME_DElTA
-from config.signals import signals_text
+from config import API_KEYS, IS_DEMO, TIMEFRAME, LEVERAGE, TIME_DElTA
+from signals import signals_text
 from data_fetcher import get_exchange, fetch_recent_data, get_filtered_markets, check_symbol_exists
 from helper.data_parce import parse_trade_signals
 from helper.design import red, print_graphic, print_candles, green, yellow
@@ -92,7 +92,7 @@ def main():
                     order_ids = open_order_with_tps_sl(exchange, symbol, buy_price, take_profits, stop_loss)
 
                     if order_ids:
-                        db_order_id = db_client_orders.insert_one(order_ids)  # save order
+                        db_order_id = db_client_orders.insert_one(order_ids)  # save order in db
                         order_general = {
                             'order_id': order_ids['order'],
                             'date_time': order_ids['date_time'],

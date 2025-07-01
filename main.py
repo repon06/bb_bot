@@ -48,7 +48,7 @@ def main():
         print("Error:", get_error(e))
 
     # сигнал из файла
-    signal_from_file = parse_trade_signals(signals_text)
+    signal_from_file = parse_trade_signals(signals_text) # from file
     # сигналы из телеги
     signals_from_tg = asyncio.run(telegram.get_tg_signal(limit=300))
 

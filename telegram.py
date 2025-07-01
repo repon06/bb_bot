@@ -75,8 +75,9 @@ async def get_tg_signals_from_insider_trade(limit=100):
             print("Вы не подписаны на канал или он приватный. Убедитесь, что ваш аккаунт в TelegramClient подписан.")
         except UsernameInvalidError:
             print("Username канала недействителен. Попробуйте по ID.")
-            dialog = check_and_get_tg_channel(tg_channel_insider_name)
-            channel = PeerChannel(dialog.id)
+            dialog = await check_and_get_tg_channel(client, tg_channel_insider_name)
+            if dialog:
+                channel = PeerChannel(dialog.id)
 
         async for message in client.iter_messages(channel, limit=limit):
             message_text = message.text
@@ -84,34 +85,24 @@ async def get_tg_signals_from_insider_trade(limit=100):
     return None
 
 
-async def check_and_get_tg_channel(tg_name_find: str):
-    if os.path.exists(f"{session_insider_account}.session"):
-        logging.info("Сессия найдена, используем сохраненную.")
-    else:
-        logging.info("Сессия не найдена, потребуется авторизация.")
+async def check_and_get_tg_channel(client: TelegramClient, tg_name_find: str):
+    dialogs = await client.get_dialogs()
 
-    async with TelegramClient(session_insider_account, tg_api_id, tg_api_hash,
-                              system_version='1.38.1',
-                              device_model='xiaomi',
-                              app_version='1.38.1') as client:
+    channels = [d for d in dialogs if d.is_channel]
+    if not channels:
+        print("Каналы не найдены в вашем аккаунте.")
+        return None
 
-        dialogs = await client.get_dialogs()
-
-        channels = [d for d in dialogs if d.is_channel]
-        if not channels:
-            print("Каналы не найдены в вашем аккаунте.")
-            return None
-
-        print("\n📋 Найденные каналы:")
-        for i, dialog in enumerate(channels):
-            line = f"{i + 1}. {dialog.title} (id: {dialog.id})"
-            if tg_name_find.startswith(dialog.title):  # 'Insider_Trade'
-                line = f"👉 {line} 👈"
-                channel_name = dialog.title
-                channel_id = dialog.id
-                channel = dialog
-            print(line)
-        return channel
+    print("\n📋 Найденные каналы:")
+    for i, dialog in enumerate(channels):
+        line = f"{i + 1}. {dialog.title} (id: {dialog.id})"
+        if tg_name_find.lstrip('@') == dialog.title:  # 'Insider_Trade'
+            line = f"👉 {line} 👈"
+            channel_name = dialog.title
+            channel_id = dialog.id
+            channel = dialog
+        print(line)
+    return channel
 
 
 # Запуск асинхронной функции

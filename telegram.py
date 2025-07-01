@@ -5,8 +5,10 @@ import re
 
 from telethon import TelegramClient
 from telethon.errors import ChannelPrivateError, UsernameInvalidError
+from telethon.tl.types import PeerChannel
 
-from config import session_name, tg_api_id, tg_api_hash, tg_channel_name, session_insider_account
+from config import session_name, tg_api_id, tg_api_hash, tg_channel_name, session_insider_account, \
+    tg_channel_insider_name
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
@@ -67,6 +69,32 @@ async def get_tg_signals_from_insider_trade(limit=100):
                               device_model='xiaomi',
                               app_version='1.38.1') as client:
 
+        try:
+            channel = await client.get_entity(tg_channel_insider_name)
+        except ChannelPrivateError:
+            print("Вы не подписаны на канал или он приватный. Убедитесь, что ваш аккаунт в TelegramClient подписан.")
+        except UsernameInvalidError:
+            print("Username канала недействителен. Попробуйте по ID.")
+            dialog = check_and_get_tg_channel(tg_channel_insider_name)
+            channel = PeerChannel(dialog.id)
+
+        async for message in client.iter_messages(channel, limit=limit):
+            message_text = message.text
+            message_date = message.date
+    return None
+
+
+async def check_and_get_tg_channel(tg_name_find: str):
+    if os.path.exists(f"{session_insider_account}.session"):
+        logging.info("Сессия найдена, используем сохраненную.")
+    else:
+        logging.info("Сессия не найдена, потребуется авторизация.")
+
+    async with TelegramClient(session_insider_account, tg_api_id, tg_api_hash,
+                              system_version='1.38.1',
+                              device_model='xiaomi',
+                              app_version='1.38.1') as client:
+
         dialogs = await client.get_dialogs()
 
         channels = [d for d in dialogs if d.is_channel]
@@ -76,19 +104,14 @@ async def get_tg_signals_from_insider_trade(limit=100):
 
         print("\n📋 Найденные каналы:")
         for i, dialog in enumerate(channels):
-            print(f"{i + 1}. {dialog.title} (id: {dialog.id})")
-
-        try:
-            channel = await client.get_entity('@Insider_Trade')
-        except ChannelPrivateError:
-            print("Вы не подписаны на канал или он приватный. Убедитесь, что ваш аккаунт в TelegramClient подписан.")
-        except UsernameInvalidError:
-            print("Username канала недействителен. Попробуйте по ID.")
-
-        async for message in client.iter_messages(channel, limit=limit):
-            message_text = message.text
-            message_date = message.date
-    return None
+            line = f"{i + 1}. {dialog.title} (id: {dialog.id})"
+            if tg_name_find.startswith(dialog.title):  # 'Insider_Trade'
+                line = f"👉 {line} 👈"
+                channel_name = dialog.title
+                channel_id = dialog.id
+                channel = dialog
+            print(line)
+        return channel
 
 
 # Запуск асинхронной функции

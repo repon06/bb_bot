@@ -82,7 +82,9 @@ async def get_tg_signals_from_insider_trade(limit=100):
         async for message in client.iter_messages(channel, limit=limit):
             message_text = message.text
             message_date = message.date
-    return None
+
+            print(f'{message_text}')
+    return []
 
 
 async def check_and_get_tg_channel(client: TelegramClient, tg_name_find: str):

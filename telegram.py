@@ -8,7 +8,7 @@ from telethon.errors import ChannelPrivateError, UsernameInvalidError
 from telethon.tl.types import PeerChannel
 
 from config import session_name, tg_api_id, tg_api_hash, tg_channel_name, session_insider_account, \
-    LOGGING, tg_channel_insider_name
+    LOGGING, tg_channel_insider_id
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
@@ -190,8 +190,8 @@ if __name__ == "__main__":
     # signals = asyncio.run(get_tg_signal(limit=50))
     # logging.info(f"1) Получено {len(signals)} сигналов.")
 
-    signals = asyncio.run(get_tg_signals_from_insider_trade_by_name(tg_channel_insider_name, limit=50))
-    logging.info(f"2) Получено {len(signals)} сигналов.")
+    # signals = asyncio.run(get_tg_signals_from_insider_trade_by_name(tg_channel_insider_name, limit=50))
+    # logging.info(f"2) Получено {len(signals)} сигналов.")
 
-# signals = asyncio.run(get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id, limit=50) )
-# logging.info(f"2) Получено {len(signals)} сигналов.")
+    signals = asyncio.run(get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id, limit=50))
+    logging.info(f"3) Получено {len(signals)} сигналов.")

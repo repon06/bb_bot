@@ -193,5 +193,5 @@ if __name__ == "__main__":
     # signals = asyncio.run(get_tg_signals_from_insider_trade_by_name(tg_channel_insider_name, limit=50))
     # logging.info(f"2) Получено {len(signals)} сигналов.")
 
-    signals = asyncio.run(get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id, limit=50))
+    signals = asyncio.run(get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id, limit=10))
     logging.info(f"3) Получено {len(signals)} сигналов.")

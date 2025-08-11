@@ -21,6 +21,7 @@ tg_api_id = os.getenv("TG_API_ID")
 tg_api_hash = os.getenv("TG_API_HASH")
 tg_channel_name = '@MYH_System'  # имя канала
 tg_channel_insider_name = '@Insider_Trade'  # имя канала
+tg_channel_insider_id = -1001515215819# '@Insider_Trade'  # имя канала
 session_name = 'session_name'
 session_insider_account = 'session_insider_account'
 

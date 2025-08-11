@@ -8,7 +8,7 @@ from telethon.errors import ChannelPrivateError, UsernameInvalidError
 from telethon.tl.types import PeerChannel
 
 from config import session_name, tg_api_id, tg_api_hash, tg_channel_name, session_insider_account, \
-    LOGGING
+    LOGGING, tg_channel_insider_name
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)

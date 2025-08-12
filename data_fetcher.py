@@ -30,6 +30,7 @@ def get_exchange(api_keys, is_demo=False):
         },
          'enableRateLimit': True,
          'options': {'defaultType': 'swap'}
+         # 'options': {'defaultType': 'future'} # чтобы все запросы шли к фьючерсному API
          })
 
     # Включение демо-торговли, если это указано
@@ -101,7 +102,7 @@ def get_filtered_markets(exchange):
     return markets
 
 
-def check_symbol_exists(exchange, symbol):
+def check_symbol_exists(exchange, symbol) -> str:
     """
     Проверяет наличие криптопары на бирже.
     """
@@ -122,6 +123,32 @@ def check_symbol_exists(exchange, symbol):
                         return market
 
         print(f"Криптопара {red(symbol)} не найдена на Bybit!")
+        return None
+    except Exception as e:
+        print(f"Ошибка при проверке символа {symbol}: {e}")
+        return None
+
+
+def check_symbol_exists(exchange, symbol):
+    """
+    Проверяет наличие криптопары на бирже, приоритет — perpetual.
+    """
+    try:
+        markets = exchange.load_markets()
+        if symbol.endswith('USDT'):
+            base = symbol[:-4]
+            perp_symbol = f"{base}/USDT:USDT"  # perpetual
+            spot_symbol = f"{base}/USDT"  # spot
+
+            if perp_symbol in markets:
+                print(f"Криптопара {symbol} найдена как {perp_symbol} (perpetual).")
+                return perp_symbol
+
+            if spot_symbol in markets:
+                print(f"Криптопара {symbol} найдена как {spot_symbol} (spot).")
+                return spot_symbol
+
+        print(f"Криптопара {symbol} не найдена.")
         return None
     except Exception as e:
         print(f"Ошибка при проверке символа {symbol}: {e}")

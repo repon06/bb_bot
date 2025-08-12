@@ -1,9 +1,9 @@
+import array
+import math
 from datetime import datetime, timezone
 from typing import List
 
-import array
 import ccxt
-import math
 
 from config import LEVERAGE, TRADE_AMOUNT
 from helper.calculate import determine_trade_type
@@ -33,7 +33,6 @@ def open_long_position(exchange, symbol, amount, current_price, take_profits: ar
     print(f"Открытие LONG позиции {red(symbol)} на {amount:.0f} за {current_price:.10f} "
           f"с тейк-профитом {take_profits} и стоп-лоссом {stop_loss:.10f}")
     if take_profits is None and stop_loss is None:
-
         take_profits = [current_price * 1.015, current_price * 1.03, current_price * 1.06]
         stop_loss = current_price * 0.98
 
@@ -397,9 +396,92 @@ def is_market_order_open(exchange, symbol: str):
     return len(order_list) > 0
 
 
-def open_order_with_tps_sl(exchange, market_symbol, buy_price, take_profits, stop_loss):
+def open_perpetual_order_by_signal(exchange, signal):
+    market_symbol = signal['symbol']
+    buy_price = signal['buy_price']
+    take_profits = signal['take_profits']
+    stop_loss = signal['stop_loss']
+    trade_type = signal['direction']  # LONG/SHORT
+
+    open_perpetual_order_id = open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss,
+                                                   trade_type=trade_type)
+    return open_perpetual_order_id
+
+
+def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss, trade_type=None):
     """
-    Открывает сделку на Bybit (лонг или шорт), автоматически определяет тип сделки,
+    Открывает фьючерсную (Perpetual) сделку на Bybit с ТП и СЛ.
+    """
+    try:
+        # Получаем тип рынка (у тебя уже есть get_market_type, можно убрать если знаем что всегда futures)
+        order_type = get_market_type(exchange, market_symbol)
+        market_type = "linear"  # фьючерсы USDT-margined
+        print(f"Тип рынка для {market_symbol}: {market_type}")
+
+        ticker = exchange.fetch_ticker(market_symbol, params={"type": "future"})
+        current_price = ticker['last']
+        print(f"Текущая цена {market_symbol}: {current_price}, цена входа: {buy_price}")
+
+        if trade_type is None:
+            trade_type = determine_trade_type(buy_price, take_profits, stop_loss, current_price)
+        if not trade_type:
+            print("Не удалось определить тип сделки")
+            return {}
+
+        # Получаем минимальный размер ордера
+        market_info = exchange.market(market_symbol)
+        min_order_size = market_info['limits']['amount']['min']
+
+        order_amount = TRADE_AMOUNT / current_price
+        if order_amount < min_order_size:
+            print(f"Слишком маленький ордер: {order_amount}, мин: {min_order_size}")
+            return {}
+
+        print(f"Открываем {trade_type.upper()} на {order_amount} {market_symbol} по цене {current_price}")
+
+        # Открытие позиции
+        order = exchange.create_order(
+            symbol=market_symbol,
+            type='market',
+            side='buy' if trade_type == 'long' else 'sell',
+            amount=order_amount,
+            params={
+                "category": "linear",  # USDT perpetual
+                "reduceOnly": False
+            }
+        )
+
+        print(f"Открыт ордер {order['id']}")
+
+        order_ids = {'symbol': market_symbol, 'order': order['id'], 'take_profits': [], 'stop_loss': None}
+
+        # Тейк-профиты
+        tp_order_ids = set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount, take_profits
+                                                  # ,params={"category": "linear"}
+                                                  )
+        order_ids['take_profits'].extend(tp_order_ids)
+
+        # Стоп-лосс
+        sl_order_id = retry_set_stop_loss(exchange, market_symbol, trade_type, order_amount, stop_loss,
+                                          params={"category": "linear"})
+
+        if sl_order_id:
+            order_ids['stop_loss'] = sl_order_id
+        else:
+            print("СЛ не установлен, закрываю позицию")
+            close_all_orders_and_positions(exchange, market_symbol, trade_type, params={"category": "linear"})
+
+        order_ids['date_time'] = datetime.now(timezone.utc)
+        return order_ids
+
+    except Exception as e:
+        print(f"Ошибка открытия фьючерсной сделки: {e}")
+        return {}
+
+
+def open_spot_order_with_tps_sl(exchange, market_symbol, buy_price, take_profits, stop_loss):
+    """
+    Открывает СПОТовую сделку на Bybit (лонг или шорт), автоматически определяет тип сделки,
     устанавливает тейк-профиты и стоп-лосс, и возвращает список ID ордеров.
 
     Аргументы:
@@ -575,6 +657,8 @@ def check_open_orders(exchange, symbol):
         open_orders = exchange.fetch_open_orders(symbol)
         if open_orders:
             print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров.")
+            for open_order in open_orders:
+                print(f"    {open_order('id')}: {open_order('type')}")
             return True
         else:
             print(f"Нет открытых ордеров для {symbol}.")
@@ -744,5 +828,34 @@ def set_take_profit(exchange, market_symbol, trade_type, order_amount, take_prof
             print(f"Тейк-профит установлен на {tp}, ID ордера: {tp_order['id']}.")
         except Exception as tp_error:
             print(f"Ошибка при установке тейк-профита на {tp}: {tp_error}")
+
+    return order_ids
+
+def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount, take_profits):
+    order_ids = []
+    side = 'sell' if trade_type == 'long' else 'buy'
+    trigger_direction = "above" if trade_type == 'long' else "below"
+
+    for tp_price in take_profits:
+        try:
+            tp_order = exchange.create_order(
+                symbol=market_symbol,
+                type='market',  # обычный маркет-ордер
+                side=side,
+                amount=order_amount / len(take_profits),
+                price=None,
+                params={
+                    'stopPrice': tp_price,              # цена срабатывания
+                    'triggerDirection': trigger_direction,
+                    'reduce_only': True,
+                    'closeOnTrigger': True,
+                    'category': 'linear',
+                    'timeInForce': 'GoodTillCancel'
+                }
+            )
+            order_ids.append(tp_order['id'])
+            print(f"Тейк-профит установлен на {tp_price}, ID ордера: {tp_order['id']}.")
+        except Exception as e:
+            print(f"Ошибка при установке тейк-профита на {tp_price}: {e}")
 
     return order_ids

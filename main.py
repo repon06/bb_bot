@@ -14,7 +14,7 @@ from helper.design import red, print_graphic, print_candles, green, yellow
 from helper.mongo import MongoDBClient
 from indicators import calculate_indicators, get_current_price
 from orders import print_order_info, get_error, check_and_open_long_order, set_leverage, is_market_order_open, \
-    open_order_with_tps_sl, check_order_statuses
+    check_order_statuses
 from signals import signals_text
 from strategy import should_short, should_long
 
@@ -59,6 +59,7 @@ def main():
             buy_price = signal['buy_price']
             take_profits = signal['take_profits']
             stop_loss = signal['stop_loss']
+            trade_type = signal['direction']  # LONG/SHORT
             date = signal['date']
 
     else:
@@ -67,6 +68,7 @@ def main():
             buy_price = signal['buy_price']  # float(signal['buy_price'])
             take_profits = signal['take_profits']  # [float(tp) for tp in signal['take_profits']]
             stop_loss = signal['stop_loss']  # float(signal['stop_loss'])
+            trade_type = signal['direction']  # LONG/SHORT
             date = signal['date']
 
             # find_signal = db_client_signals.find_one({'symbol': symbol_parce, 'buy_price': buy_price})
@@ -74,7 +76,7 @@ def main():
             #    db_signal_id = db_client_signals.insert_one(signal)  # add mongo
             #    print(f"Inserted signal with symbol: {symbol_parce} and ID: {db_signal_id}")
             ################################################################
-            symbol = check_symbol_exists(exchange, symbol)
+            symbol = check_symbol_exists(exchange, symbol) # TODO: надо ли указывать символ пары в таком виде?
             if symbol:
                 signal['symbol'] = symbol
                 signal['status']: 'found'
@@ -90,7 +92,9 @@ def main():
                         f"Found order: {db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})}")  # Поиск сигнала
                 elif date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     # Открываем сделку с ТП и СЛ
-                    order_ids = open_order_with_tps_sl(exchange, symbol, buy_price, take_profits, stop_loss)
+                    # order_ids = orders.open_spot_order_with_tps_sl(exchange, symbol, buy_price, take_profits, stop_loss)
+                    # order_ids = orders.open_perpetual_order(exchange, symbol, buy_price, take_profits, stop_loss)
+                    order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
 
                     if order_ids:
                         db_order_id = db_client_orders.insert_one(order_ids)  # save order in db

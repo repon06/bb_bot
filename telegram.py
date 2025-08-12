@@ -131,9 +131,9 @@ async def get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id: int, li
 
         i = 0
         async for message in client.iter_messages(channel, limit=limit):
-            message_text = message.text
-            message_text = re.sub(r"[^\w\s.,-]", "", message_text)
-            message_date = message.date
+            if message.text is not None:
+                message_text = re.sub(r"[^\w\s.,-]", "", message.text, flags=re.UNICODE)
+                message_date = message.date
 
             if LOGGING:
                 print(f'{i} ({message_date}): {message_text}')
@@ -142,7 +142,7 @@ async def get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id: int, li
             match = re.search(signal_pattern, message_text, re.DOTALL)
             if match:
                 symbol = match.group(1)
-                direction = match.group(2)
+                direction = match.group(2).lower()  # направление
                 buy_price = float(match.group(3))
                 take_profits = [float(x.strip()) for x in match.group(4).split(',')]
                 stop_loss = float(match.group(5))
@@ -152,6 +152,7 @@ async def get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id: int, li
                     'buy_price': buy_price,
                     'take_profits': take_profits,
                     'stop_loss': stop_loss,
+                    'direction': direction,
                     'date': message_date
                 }
                 signals.append(signal_data)

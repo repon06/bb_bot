@@ -414,9 +414,9 @@ def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_
     """
     try:
         # Получаем тип рынка (у тебя уже есть get_market_type, можно убрать если знаем что всегда futures)
-        order_type = get_market_type(exchange, market_symbol)
-        market_type = "linear"  # фьючерсы USDT-margined
-        print(f"Тип рынка для {market_symbol}: {market_type}")
+        # 'swap' # order_type = get_market_type(exchange, market_symbol)
+        # market_type = "linear"  # фьючерсы USDT-margined
+        # print(f"Тип рынка для {market_symbol}: {market_type}")
 
         ticker = exchange.fetch_ticker(market_symbol, params={"type": "future"})
         current_price = ticker['last']
@@ -426,6 +426,11 @@ def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_
             trade_type = determine_trade_type(buy_price, take_profits, stop_loss, current_price)
         if not trade_type:
             print("Не удалось определить тип сделки")
+            return {}
+
+        if trade_type != determine_trade_type(buy_price, take_profits, stop_loss, current_price):
+            print(
+                f"Направление сделки {trade_type} не соответствует текущей цене {current_price} и ТП {take_profits}/СЛ {stop_loss}")
             return {}
 
         # Получаем минимальный размер ордера
@@ -831,6 +836,7 @@ def set_take_profit(exchange, market_symbol, trade_type, order_amount, take_prof
 
     return order_ids
 
+
 def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount, take_profits):
     order_ids = []
     side = 'sell' if trade_type == 'long' else 'buy'
@@ -845,7 +851,7 @@ def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount
                 amount=order_amount / len(take_profits),
                 price=None,
                 params={
-                    'stopPrice': tp_price,              # цена срабатывания
+                    'stopPrice': tp_price,  # цена срабатывания
                     'triggerDirection': trigger_direction,
                     'reduce_only': True,
                     'closeOnTrigger': True,

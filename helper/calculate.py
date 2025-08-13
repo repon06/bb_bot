@@ -116,6 +116,10 @@ def determine_trade_type(buy_price, take_profits, stop_loss, current_price=None)
             return 'long'
         elif all(tp < current_price for tp in take_profits) and stop_loss > current_price:
             return 'short'
+        elif take_profits[0] < current_price:
+            return 'short'
+        elif take_profits[0] > current_price:
+            return 'long'
 
     # Если не удалось определить тип сделки
     return None

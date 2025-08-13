@@ -9,13 +9,11 @@ import orders
 import telegram
 from config import API_KEYS, IS_DEMO, TIMEFRAME, LEVERAGE, TIME_DElTA, tg_channel_insider_id
 from data_fetcher import get_exchange, fetch_recent_data, get_filtered_markets, check_symbol_exists
-from helper.data_parce import parse_trade_signals
 from helper.design import red, print_graphic, print_candles, green, yellow
 from helper.mongo import MongoDBClient
 from indicators import calculate_indicators, get_current_price
 from orders import print_order_info, get_error, check_and_open_long_order, set_leverage, is_market_order_open, \
     check_order_statuses
-from signals import signals_text
 from strategy import should_short, should_long
 
 
@@ -48,7 +46,7 @@ def main():
         print("Error:", get_error(e))
 
     # сигнал из файла
-    signal_from_file = parse_trade_signals(signals_text)  # from file
+    signal_from_file = None  # TODO: пока убрал parse_trade_signals(signals_text)  # from file
     # сигналы из телеги
     # signals_from_tg = asyncio.run(telegram.get_tg_signal(limit=300))
     signals_from_tg = asyncio.run(telegram.get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id, limit=10))
@@ -76,7 +74,7 @@ def main():
             #    db_signal_id = db_client_signals.insert_one(signal)  # add mongo
             #    print(f"Inserted signal with symbol: {symbol_parce} and ID: {db_signal_id}")
             ################################################################
-            symbol = check_symbol_exists(exchange, symbol) # TODO: надо ли указывать символ пары в таком виде?
+            symbol = check_symbol_exists(exchange, symbol)  # TODO: надо ли указывать символ пары в таком виде?
             if symbol:
                 signal['symbol'] = symbol
                 signal['status']: 'found'

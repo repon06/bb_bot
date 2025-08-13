@@ -7,7 +7,7 @@ import schedule
 
 import orders
 import telegram
-from config import API_KEYS, IS_DEMO, TIMEFRAME, LEVERAGE, TIME_DElTA, tg_channel_insider_id
+from config import API_KEYS, IS_DEMO, TIMEFRAME, LEVERAGE, TIME_DElTA, tg_channel_insider_id, LAST_MESSAGE_COUNT
 from data_fetcher import get_exchange, fetch_recent_data, get_filtered_markets, check_symbol_exists
 from helper.design import red, print_graphic, print_candles, green, yellow
 from helper.mongo import MongoDBClient
@@ -49,7 +49,8 @@ def main():
     signal_from_file = None  # TODO: пока убрал parse_trade_signals(signals_text)  # from file
     # сигналы из телеги
     # signals_from_tg = asyncio.run(telegram.get_tg_signal(limit=300))
-    signals_from_tg = asyncio.run(telegram.get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id, limit=10))
+    signals_from_tg = asyncio.run(
+        telegram.get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id, limit=LAST_MESSAGE_COUNT))
 
     if not signals_from_tg and signal_from_file:
         for signal in signal_from_file:
@@ -87,11 +88,12 @@ def main():
                 if orders.check_open_orders(exchange, symbol):
                     print(f"Для символа {red(symbol)} уже есть открытые сделки. Пропускаем открытие новой.")
                     print(
-                        f"Found order: {db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})}")  # Поиск сигнала
+                        f"Found order: {db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})}")  # Поиск сигнала в БД
+                    orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type)
                 elif date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     # Открываем сделку с ТП и СЛ
                     # order_ids = orders.open_spot_order_with_tps_sl(exchange, symbol, buy_price, take_profits, stop_loss)
-                    # order_ids = orders.open_perpetual_order(exchange, symbol, buy_price, take_profits, stop_loss)
+                    # order_ids = orders.open_perpetual_order(exchange, symbol, buy_price, take_profits, stop_loss,trade_type, current_price)
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
 
                     if order_ids:

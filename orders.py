@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import List
 
 import ccxt
+from deprecated import deprecated
 
 from config import LEVERAGE, TRADE_AMOUNT
 from helper.calculate import determine_trade_type
@@ -155,6 +156,7 @@ def check_and_open_long_order(exchange, symbol, usdt_balance, take_profits: arra
     return order
 
 
+@deprecated(reason="метод устарел")
 def open_short_position(exchange, symbol, amount, take_profits, stop_loss, leverage):
     """
     Открывает короткую позицию на рынке с заданным плечом, тейк-профитом и стоп-лоссом.
@@ -253,6 +255,7 @@ def open_long_position_with_tp_sl(exchange, symbol, leverage, take_profits=None,
     set_stop_loss_2(exchange, symbol, stop_loss, amount_in_contracts)
 
 
+@deprecated(reason="Этот метод устарел")
 def open_long_position_with_tp_sl_OLD(exchange, symbol, leverage, take_profits=None, stop_loss=None):
     current_price = exchange.fetch_ticker(symbol)['last']
     usdt_balance = exchange.fetch_balance()['USDT']['free']
@@ -326,6 +329,7 @@ def open_long_position_with_tp_sl_OLD(exchange, symbol, leverage, take_profits=N
     set_stop_loss_2(exchange, symbol, stop_loss, amount)
 
 
+@deprecated(reason="Этот метод устарел")
 def set_stop_loss_2(exchange, symbol, stop_loss, amount):
     try:
         sl_order = exchange.create_order(
@@ -345,6 +349,7 @@ def set_stop_loss_2(exchange, symbol, stop_loss, amount):
         print(f"Ошибка установки стоп-лосса: {get_error(e)}")
 
 
+@deprecated(reason="Этот метод устарел, используем auto_move_sl_to_break_even()")
 def move_stop_to_breakeven(exchange, symbol, entry_price, remaining_amount):
     """
     Перемещает стоп-лосс в точку безубыточности.
@@ -370,6 +375,7 @@ def move_stop_to_breakeven(exchange, symbol, entry_price, remaining_amount):
         print(f"Ошибка при переносе стоп-лосса в безубыток: {get_error(e)}")
 
 
+@deprecated(reason="Этот метод устарел, используем auto_move_sl_to_break_even()")
 def check_and_move_to_breakeven(exchange, symbol, entry_price, tp1_price, remaining_amount):
     """
     Проверяет достижение TP1 и перемещает стоп-лосс в безубыток.
@@ -403,13 +409,15 @@ def open_perpetual_order_by_signal(exchange, signal):
     take_profits = [0.8058, 0.8565]
     stop_loss = signal['stop_loss']
     trade_type = signal['direction']  # LONG/SHORT
+    current_price = signal['current_price']
 
     open_perpetual_order_id = open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss,
-                                                   trade_type=trade_type)
+                                                   trade_type=trade_type, current_price=current_price)
     return open_perpetual_order_id
 
 
-def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss, trade_type=None):
+def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss, trade_type=None,
+                         current_price=None):
     """
     Открывает фьючерсную (Perpetual) сделку на Bybit с ТП и СЛ.
     """
@@ -485,6 +493,7 @@ def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_
         return {}
 
 
+@deprecated(reason="Этот метод устарел")
 def open_spot_order_with_tps_sl(exchange, market_symbol, buy_price, take_profits, stop_loss):
     """
     Открывает СПОТовую сделку на Bybit (лонг или шорт), автоматически определяет тип сделки,
@@ -896,6 +905,7 @@ def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount
     return order_ids
 
 
+@deprecated()
 def move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type):
     # Получаем все открытые ордера по символу
     open_orders = exchange.fetch_open_orders(symbol=market_symbol)
@@ -922,7 +932,7 @@ def move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type):
     return sl_order_id
 
 
-def auto_move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type, order_amount):
+def auto_move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type):
     """
     Авто-перенос стоп-лосса в безубыток после первого срабатывшего ТП
 
@@ -930,9 +940,15 @@ def auto_move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type,
     market_symbol   -- символ рынка, например 'ENA/USDT:USDT'
     entry_price     -- цена входа в позицию
     trade_type      -- 'long' или 'short'
-    order_amount    -- количество открытой позиции
     """
     try:
+        # Получаем размер текущей позиции
+        position = exchange.fetch_positions([market_symbol])[0]  # fetch_positions возвращает список
+        order_amount = float(position['contracts'] or position.get('size', 0))
+        if order_amount == 0:
+            print("Позиция не найдена или закрыта.")
+            return None
+
         # Получаем все закрытые ордера по символу
         closed_orders = exchange.fetch_closed_orders(symbol=market_symbol)
 
@@ -940,8 +956,8 @@ def auto_move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type,
         first_tp = None
         tp_side = 'sell' if trade_type == 'long' else 'buy'
         for order in sorted(closed_orders, key=lambda o: o['timestamp']):
-            if order['side'] == tp_side and order.get('reduce_only', False) and order['status'] in (
-                    'closed', 'canceled'):
+            if (order['side'] == tp_side and not order['reduceOnly']
+                    and order['status'] in ('closed', 'canceled')):
                 first_tp = order
                 break
 

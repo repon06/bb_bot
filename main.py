@@ -8,7 +8,7 @@ import schedule
 import orders
 import telegram
 from config import API_KEYS, IS_DEMO, TIMEFRAME, LEVERAGE, TIME_DElTA, tg_channel_insider_id, LAST_MESSAGE_COUNT
-from data_fetcher import get_exchange, fetch_recent_data, get_filtered_markets, check_symbol_exists
+from data_fetcher import get_exchange, fetch_recent_data, check_symbol_exists
 from helper.design import red, print_graphic, print_candles, green, yellow
 from helper.mongo import MongoDBClient
 from indicators import calculate_indicators, get_current_price
@@ -29,8 +29,8 @@ def main():
 
     usdt_balance = 0.0
     exchange = get_exchange(API_KEYS, is_demo=IS_DEMO)
-    markets = get_filtered_markets(exchange)
-    markets = {}
+    # список валют markets = get_filtered_markets(exchange)
+    # список валют markets = {}
 
     # symbol = SYMBOLS[0] + ":USDT"  # "TROY/USDT:USDT" "APE/USDT:USDT" "ADA/USDT:USDT"
     # if not is_market_order_open(exchange, symbol):

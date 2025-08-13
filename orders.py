@@ -405,8 +405,8 @@ def is_market_order_open(exchange, symbol: str):
 def open_perpetual_order_by_signal(exchange, signal):
     market_symbol = signal['symbol']
     buy_price = signal['buy_price']
-    # TODO: debug take_profits = signal['take_profits']
-    take_profits = [0.8058, 0.8565]
+    take_profits = signal['take_profits']
+    # take_profits = [0.8058, 0.8565]
     stop_loss = signal['stop_loss']
     trade_type = signal['direction']  # LONG/SHORT
     current_price = signal['current_price']
@@ -932,59 +932,67 @@ def move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type):
     return sl_order_id
 
 
-def auto_move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type):
+def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
     """
-    Авто-перенос стоп-лосса в безубыток после первого срабатывшего ТП
-
-    exchange        -- экземпляр ccxt биржи
-    market_symbol   -- символ рынка, например 'ENA/USDT:USDT'
-    entry_price     -- цена входа в позицию
-    trade_type      -- 'long' или 'short'
+    Авто-перенос СЛ в безубыток после первого срабатывшего ТП
     """
     try:
-        # Получаем размер текущей позиции
-        position = exchange.fetch_positions([market_symbol])[0]  # fetch_positions возвращает список
-        order_amount = float(position['contracts'] or position.get('size', 0))
-        if order_amount == 0:
-            print("Позиция не найдена или закрыта.")
-            return None
+        market_symbol = symbol.replace("/", "").replace(":USDT", "USDT")
 
-        # Получаем все закрытые ордера по символу
-        closed_orders = exchange.fetch_closed_orders(symbol=market_symbol)
-
-        # Определяем первый сработавший TP для нашей позиции
-        first_tp = None
+        # 1. Определяем сторону сделки и стопа
         tp_side = 'sell' if trade_type == 'long' else 'buy'
+        sl_side = 'sell' if trade_type == 'long' else 'buy'
+
+        # 2. Получаем закрытые ордера
+        closed_orders = exchange.fetch_closed_orders(symbol=symbol)
+        first_tp = None
         for order in sorted(closed_orders, key=lambda o: o['timestamp']):
-            if (order['side'] == tp_side and order['reduceOnly']
+            if (order['side'] == tp_side and order.get('reduceOnly', False)
                     and order['status'] in ('closed', 'canceled')):
                 first_tp = order
                 break
 
         if not first_tp:
-            print("Ни один тейк-профит ещё не сработал.")
-            return None
+            print(f"Перенос SL в безубыток не нужен — TP ещё не сработал для {symbol}")
+            return
 
-        # Проверяем, не был ли уже перенесен стоп в безубыток
-        open_orders = exchange.fetch_open_orders(symbol=market_symbol)
+        # 3. Получаем открытые ордера и ищем SL
+        open_orders = exchange.fetch_open_orders(symbol=symbol)
+        existing_sl = None
         for order in open_orders:
-            if order.get('reduce_only', False) and order.get('stopPrice') == entry_price:
-                print("Стоп уже перенесён в безубыток.")
-                return order['id']
+            if (order['side'] == sl_side and order.get('reduceOnly', False)
+                    and float(order['stopPrice']) != float(buy_price)):
+                existing_sl = order
+                break
 
-        # Выставляем новый стоп-лосс в безубыток
-        sl_order_id = set_stop_loss_perpetual(
-            exchange,
-            market_symbol,
-            trade_type,
-            order_amount=order_amount,
-            stop_loss=entry_price
+        # 4. Если SL уже в безубытке — выходим
+        if existing_sl and float(existing_sl['stopPrice']) == float(buy_price):
+            print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется.")
+            return
+
+        # 5. Удаляем старый SL, если он есть
+        if existing_sl:
+            exchange.cancel_order(existing_sl['id'], symbol=symbol)
+            print(f"Удалён старый SL ({existing_sl['stopPrice']}) для {symbol}")
+
+        # 6. Ставим новый SL в безубыток
+        amount = existing_sl['amount'] if existing_sl else None
+        if amount is None:
+            # fallback — берём из позиции
+            position = exchange.fetch_positions([symbol])[0]
+            amount = abs(float(position['contracts']))
+
+        new_sl = exchange.create_order(
+            symbol=symbol,
+            type='market',
+            side=sl_side,
+            amount=amount,
+            params={
+                'stopLossPrice': buy_price,
+                'reduceOnly': True
+            }
         )
-
-        if sl_order_id:
-            print(f"Стоп перенесён в безубыток на {entry_price}, ID: {sl_order_id}")
-        return sl_order_id
+        print(f"Стоп перенесён в безубыток на {buy_price}, ID: {new_sl['id']}")
 
     except Exception as e:
-        print(f"Ошибка при переносе стопа в безубыток: {e}")
-        return None
+        print(f"Ошибка переноса SL в безубыток для {symbol}: {e}")

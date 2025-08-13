@@ -70,6 +70,11 @@ def main():
             trade_type = signal['direction']  # LONG/SHORT
             date = signal['date']
 
+            ticker = exchange.fetch_ticker(symbol, params={"type": "future"})
+            current_price = ticker['last']
+            signal['current_price'] = current_price
+            print(f"Текущая цена {symbol}: {current_price}, цена входа: {buy_price}")
+
             # find_signal = db_client_signals.find_one({'symbol': symbol_parce, 'buy_price': buy_price})
             # if not db_client_signals.find_one({'symbol': symbol_parce, 'buy_price': buy_price}):
             #    db_signal_id = db_client_signals.insert_one(signal)  # add mongo

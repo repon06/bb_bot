@@ -427,9 +427,9 @@ def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_
         # market_type = "linear"  # фьючерсы USDT-margined
         # print(f"Тип рынка для {market_symbol}: {market_type}")
 
-        ticker = exchange.fetch_ticker(market_symbol, params={"type": "future"})
-        current_price = ticker['last']
-        print(f"Текущая цена {market_symbol}: {current_price}, цена входа: {buy_price}")
+        # ticker = exchange.fetch_ticker(market_symbol, params={"type": "future"})
+        # current_price = ticker['last']
+        # print(f"Текущая цена {market_symbol}: {current_price}, цена входа: {buy_price}")
 
         if trade_type is None:
             trade_type = determine_trade_type(buy_price, take_profits, stop_loss, current_price)
@@ -451,7 +451,7 @@ def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_
             print(f"Слишком маленький ордер: {order_amount}, мин: {min_order_size}")
             return {}
 
-        print(f"Открываем {trade_type.upper()} на {order_amount} {market_symbol} по цене {current_price}")
+        print(f"Открываем {trade_type.upper()} на {order_amount} {green(market_symbol)} по цене {current_price}")
 
         # Открытие позиции
         order = exchange.create_order(
@@ -956,7 +956,7 @@ def auto_move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type)
         first_tp = None
         tp_side = 'sell' if trade_type == 'long' else 'buy'
         for order in sorted(closed_orders, key=lambda o: o['timestamp']):
-            if (order['side'] == tp_side and not order['reduceOnly']
+            if (order['side'] == tp_side and order['reduceOnly']
                     and order['status'] in ('closed', 'canceled')):
                 first_tp = order
                 break

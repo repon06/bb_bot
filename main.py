@@ -30,7 +30,8 @@ def main():
     usdt_balance = 0.0
     exchange = get_exchange(API_KEYS, is_demo=IS_DEMO)
     # список валют markets = get_filtered_markets(exchange)
-    # список валют markets = {}
+    markets = {}
+    signals_to_process = []
 
     # symbol = SYMBOLS[0] + ":USDT"  # "TROY/USDT:USDT" "APE/USDT:USDT" "ADA/USDT:USDT"
     # if not is_market_order_open(exchange, symbol):
@@ -52,17 +53,12 @@ def main():
     signals_from_tg = asyncio.run(
         telegram.get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id, limit=LAST_MESSAGE_COUNT))
 
-    if not signals_from_tg and signal_from_file:
-        for signal in signal_from_file:
-            symbol = signal['symbol']
-            buy_price = signal['buy_price']
-            take_profits = signal['take_profits']
-            stop_loss = signal['stop_loss']
-            trade_type = signal['direction']  # LONG/SHORT
-            date = signal['date']
+    if signal_from_file:
+        signals_to_process.extend(signal_from_file)
+    if signals_from_tg:
+        signals_to_process.extend(signals_from_tg)
 
-    else:
-        for signal in signals_from_tg:
+        for signal in signals_to_process:
             symbol = signal['symbol']
             buy_price = signal['buy_price']  # float(signal['buy_price'])
             take_profits = signal['take_profits']  # [float(tp) for tp in signal['take_profits']]
@@ -75,19 +71,18 @@ def main():
             signal['current_price'] = current_price
             print(f"Текущая цена {symbol}: {current_price}, цена входа: {buy_price}")
 
-            # find_signal = db_client_signals.find_one({'symbol': symbol_parce, 'buy_price': buy_price})
-            # if not db_client_signals.find_one({'symbol': symbol_parce, 'buy_price': buy_price}):
-            #    db_signal_id = db_client_signals.insert_one(signal)  # add mongo
-            #    print(f"Inserted signal with symbol: {symbol_parce} and ID: {db_signal_id}")
-            ################################################################
             symbol = check_symbol_exists(exchange, symbol)  # TODO: надо ли указывать символ пары в таком виде?
             if symbol:
                 signal['symbol'] = symbol
                 signal['status']: 'found'
                 print(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
 
-                if not db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price}):
+                # если сигнал такой еще не обрабатывали - добавляем его в бд
+                if not db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price, 'direction': trade_type}):
                     db_client_signals.insert_one(signal)  # add mongo
+                else:
+                    print(f"Сигнал по {symbol} с ценой {buy_price} уже обработан. Пропускаем открытие.")
+                    continue
 
                 # Проверка на открытые ордера
                 if orders.check_open_orders(exchange, symbol):
@@ -95,10 +90,11 @@ def main():
                     print(
                         f"Found order: {db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})}")  # Поиск сигнала в БД
                     orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type)
+                elif orders.check_closed_orders(exchange, symbol):
+                    print(
+                        f"Для символа {red(symbol)} уже были открытые сделки. Уже закрыты. Пропускаем открытие новой.")
                 elif date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
-                    # Открываем сделку с ТП и СЛ
-                    # order_ids = orders.open_spot_order_with_tps_sl(exchange, symbol, buy_price, take_profits, stop_loss)
-                    # order_ids = orders.open_perpetual_order(exchange, symbol, buy_price, take_profits, stop_loss,trade_type, current_price)
+                    # Открываем сделку/позицию с ТП и СЛ если свежий сигнал
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
 
                     if order_ids:

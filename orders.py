@@ -934,12 +934,12 @@ def move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type):
 
 def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
     """
-    Авто-перенос СЛ в безубыток после первого срабатывшего ТП
+    Авто-перенос SL в безубыток после первого срабатывшего TP
     """
     try:
         market_symbol = symbol.replace("/", "").replace(":USDT", "USDT")
 
-        # 1. Определяем сторону сделки и стопа
+        # 1. Определяем стороны для TP и SL
         tp_side = 'sell' if trade_type == 'long' else 'buy'
         sl_side = 'sell' if trade_type == 'long' else 'buy'
 
@@ -947,6 +947,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
         closed_orders = exchange.fetch_closed_orders(symbol=symbol)
         first_tp = None
         for order in sorted(closed_orders, key=lambda o: o['timestamp']):
+            # Ищем первый сработавший TP (reduceOnly=True)
             if (order['side'] == tp_side and order.get('reduceOnly', False)
                     and order['status'] in ('closed', 'canceled')):
                 first_tp = order
@@ -956,7 +957,17 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
             print(f"Перенос SL в безубыток не нужен — TP ещё не сработал для {symbol}")
             return
 
-        # 3. Получаем открытые ордера и ищем SL
+        # 3. Проверка текущей цены перед переносом
+        ticker = exchange.fetch_ticker(symbol)
+        current_price = float(ticker['last'])
+        if trade_type == 'long' and buy_price >= current_price:
+            print(f"Пропуск: SL {buy_price} для лонга выше/равен текущей цене {current_price}")
+            return
+        elif trade_type == 'short' and buy_price <= current_price:
+            print(f"Пропуск: SL {buy_price} для шорта ниже/равен текущей цене {current_price}")
+            return
+
+        # 4. Получаем открытые ордера и ищем SL
         open_orders = exchange.fetch_open_orders(symbol=symbol)
         existing_sl = None
         for order in open_orders:
@@ -965,23 +976,23 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
                 existing_sl = order
                 break
 
-        # 4. Если SL уже в безубытке — выходим
+        # 5. Если SL уже в безубытке — выходим
         if existing_sl and float(existing_sl['stopPrice']) == float(buy_price):
             print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется.")
             return
 
-        # 5. Удаляем старый SL, если он есть
+        # 6. Удаляем старый SL, если он есть
         if existing_sl:
             exchange.cancel_order(existing_sl['id'], symbol=symbol)
             print(f"Удалён старый SL ({existing_sl['stopPrice']}) для {symbol}")
 
-        # 6. Ставим новый SL в безубыток
+        # 7. Определяем количество
         amount = existing_sl['amount'] if existing_sl else None
         if amount is None:
-            # fallback — берём из позиции
             position = exchange.fetch_positions([symbol])[0]
             amount = abs(float(position['contracts']))
 
+        # 8. Создаём новый SL в безубыток
         new_sl = exchange.create_order(
             symbol=symbol,
             type='market',
@@ -996,3 +1007,15 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
 
     except Exception as e:
         print(f"Ошибка переноса SL в безубыток для {symbol}: {e}")
+
+
+def check_closed_orders(exchange, symbol, recent_ms=60_000):
+    # Дополнительная проверка: недавно - (60 сек) закрытая позиция
+    closed_orders = exchange.fetch_closed_orders(symbol=symbol)
+    if closed_orders:
+        last_closed = sorted(closed_orders, key=lambda o: o['timestamp'])[-1]
+        # Можно поставить таймер или проверку условий, чтобы не входить сразу
+        if (time.time() * 1000) - last_closed['timestamp'] < recent_ms * 30:
+            print(f"Последняя позиция по {symbol} закрыта недавно, пропуск.")
+            return True
+    return False

@@ -399,7 +399,8 @@ def is_market_order_open(exchange, symbol: str):
 def open_perpetual_order_by_signal(exchange, signal):
     market_symbol = signal['symbol']
     buy_price = signal['buy_price']
-    take_profits = signal['take_profits']
+    # TODO: debug take_profits = signal['take_profits']
+    take_profits = [0.8058, 0.8565]
     stop_loss = signal['stop_loss']
     trade_type = signal['direction']  # LONG/SHORT
 
@@ -467,8 +468,8 @@ def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_
         order_ids['take_profits'].extend(tp_order_ids)
 
         # Стоп-лосс
-        sl_order_id = retry_set_stop_loss(exchange, market_symbol, trade_type, order_amount, stop_loss,
-                                          params={"category": "linear"})
+        # sl_order_id = retry_set_stop_loss(exchange, market_symbol, trade_type, order_amount, stop_loss, params={"category": "linear"})
+        sl_order_id = set_stop_loss_perpetual(exchange, market_symbol, trade_type, order_amount, stop_loss)
 
         if sl_order_id:
             order_ids['stop_loss'] = sl_order_id
@@ -663,7 +664,8 @@ def check_open_orders(exchange, symbol):
         if open_orders:
             print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров.")
             for open_order in open_orders:
-                print(f"    {open_order('id')}: {open_order('type')}")
+                print(
+                    f"    {open_order['id']}: {open_order['type']}, тп/сл: {open_order['reduceOnly']}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
             return True
         else:
             print(f"Нет открытых ордеров для {symbol}.")
@@ -707,6 +709,33 @@ def close_all_orders_and_positions(exchange, market_symbol, trade_type):
 
 
 import time
+
+
+def set_stop_loss_perpetual(exchange, market_symbol, trade_type, order_amount, stop_loss):
+    side = 'sell' if trade_type == 'long' else 'buy'
+    trigger_direction = 'below' if trade_type == 'long' else 'above'
+
+    try:
+        sl_order = exchange.create_order(
+            symbol=market_symbol,
+            type='market',  # Bybit воспринимает как стоп-ордер через параметры
+            side=side,
+            amount=order_amount,
+            price=None,
+            params={
+                'stopPrice': stop_loss,
+                'triggerDirection': trigger_direction,
+                'reduce_only': True,
+                'closeOnTrigger': True,
+                'category': 'linear',
+                'timeInForce': 'GoodTillCancel'
+            }
+        )
+        print(f"Стоп-лосс установлен на {stop_loss}, ID: {sl_order['id']}")
+        return sl_order['id']
+    except Exception as e:
+        print(f"Ошибка установки стоп-лосса: {e}")
+        return None
 
 
 def retry_set_stop_loss(exchange, market_symbol, trade_type, order_amount, stop_loss, max_retries=5, retry_delay=10):
@@ -865,3 +894,81 @@ def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount
             print(f"Ошибка при установке тейк-профита на {tp_price}: {e}")
 
     return order_ids
+
+
+def move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type):
+    # Получаем все открытые ордера по символу
+    open_orders = exchange.fetch_open_orders(symbol=market_symbol)
+    closed_orders = exchange.fetch_closed_orders(symbol=market_symbol)
+
+    # Ищем первый сработавший тейк-профит
+    first_tp = None
+    for order in closed_orders:
+        if order['side'] == ('sell' if trade_type == 'long' else 'buy') and order['status'] == 'closed':
+            first_tp = order
+            break
+
+    if not first_tp:
+        print("Ни один тейк-профит ещё не сработал.")
+        return None
+
+    # Ставим стоп-лосс в безубыток
+    stop_price = entry_price
+    sl_order_id = set_stop_loss_perpetual(
+        exchange, market_symbol, trade_type, order_amount=first_tp['amount'], stop_loss=stop_price
+    )
+    if sl_order_id:
+        print(f"Стоп перенесён в безубыток на {stop_price}, ID: {sl_order_id}")
+    return sl_order_id
+
+
+def auto_move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type, order_amount):
+    """
+    Авто-перенос стоп-лосса в безубыток после первого срабатывшего ТП
+
+    exchange        -- экземпляр ccxt биржи
+    market_symbol   -- символ рынка, например 'ENA/USDT:USDT'
+    entry_price     -- цена входа в позицию
+    trade_type      -- 'long' или 'short'
+    order_amount    -- количество открытой позиции
+    """
+    try:
+        # Получаем все закрытые ордера по символу
+        closed_orders = exchange.fetch_closed_orders(symbol=market_symbol)
+
+        # Определяем первый сработавший TP для нашей позиции
+        first_tp = None
+        tp_side = 'sell' if trade_type == 'long' else 'buy'
+        for order in sorted(closed_orders, key=lambda o: o['timestamp']):
+            if order['side'] == tp_side and order.get('reduce_only', False) and order['status'] in (
+                    'closed', 'canceled'):
+                first_tp = order
+                break
+
+        if not first_tp:
+            print("Ни один тейк-профит ещё не сработал.")
+            return None
+
+        # Проверяем, не был ли уже перенесен стоп в безубыток
+        open_orders = exchange.fetch_open_orders(symbol=market_symbol)
+        for order in open_orders:
+            if order.get('reduce_only', False) and order.get('stopPrice') == entry_price:
+                print("Стоп уже перенесён в безубыток.")
+                return order['id']
+
+        # Выставляем новый стоп-лосс в безубыток
+        sl_order_id = set_stop_loss_perpetual(
+            exchange,
+            market_symbol,
+            trade_type,
+            order_amount=order_amount,
+            stop_loss=entry_price
+        )
+
+        if sl_order_id:
+            print(f"Стоп перенесён в безубыток на {entry_price}, ID: {sl_order_id}")
+        return sl_order_id
+
+    except Exception as e:
+        print(f"Ошибка при переносе стопа в безубыток: {e}")
+        return None

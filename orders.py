@@ -1007,7 +1007,96 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
                 'reduceOnly': True
             }
         )
-        print(f"Стоп перенесён в безубыток: выбрана цена SL = {sl_trigger_price} (buy_price={buy_price}, current_price={current_price}), ID: {new_sl['id']}")
+        print(
+            f"Стоп перенесён в безубыток: выбрана цена SL = {sl_trigger_price} (buy_price={buy_price}, current_price={current_price}), ID: {new_sl['id']}")
+
+    except Exception as e:
+        print(f"Ошибка переноса SL в безубыток для {symbol}: {e}")
+
+
+def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
+    """
+    Авто-перенос SL в безубыток после первого срабатывшего TP.
+    SL двигается только если первый TP сработал или оставшийся объем позиции меньше объема одного TP.
+    Объем TP1 берется из ордеров на бирже.
+    """
+    try:
+        tp_side = 'sell' if trade_type == 'long' else 'buy'
+        sl_side = 'sell' if trade_type == 'long' else 'buy'
+
+        # Получаем открытые и закрытые ордера
+        open_orders = exchange.fetch_open_orders(symbol=symbol)
+        closed_orders = exchange.fetch_closed_orders(symbol=symbol)
+
+        # Определяем первый TP из открытых ордеров
+        tp_orders = [o for o in open_orders if o['side'] == tp_side and o.get('reduceOnly', False)]
+        tp_orders_sorted = sorted(tp_orders, key=lambda o: o.get('price') or o.get('stopPrice'))
+        first_tp_order = tp_orders_sorted[0] if tp_orders_sorted else None
+
+        # Проверяем, сработал ли первый TP
+        first_tp_closed = False
+        if first_tp_order:
+            for o in closed_orders:
+                if o['id'] == first_tp_order['id'] and o['status'] == 'closed':
+                    first_tp_closed = True
+                    break
+
+        # Считаем текущий открытый объем позиции
+        remaining_amount = sum(float(o['amount']) for o in open_orders if o.get('reduceOnly', False))
+        tp_volume = float(first_tp_order['amount']) if first_tp_order else 0
+
+        # Проверяем условие переноса SL
+        if not first_tp_closed and remaining_amount >= tp_volume and tp_volume > 0:
+            print(f"SL не двигаем: первый TP не сработал и позиция полная (remaining_amount={remaining_amount})")
+            return
+
+        # Ищем существующий SL
+        existing_sl = None
+        for o in open_orders:
+            if o['side'] == sl_side and o.get('reduceOnly', False):
+                existing_sl = o
+                break
+
+        if existing_sl and float(existing_sl.get('stopPrice', 0)) == float(buy_price):
+            print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется.")
+            return
+
+        # Удаляем старый SL, если есть
+        if existing_sl:
+            exchange.cancel_order(existing_sl['id'], symbol=symbol)
+            print(f"Удалён старый SL ({existing_sl.get('stopPrice')}) для {symbol}")
+
+        # Определяем количество для нового SL
+        amount = existing_sl['amount'] if existing_sl else remaining_amount
+        if amount == 0:
+            print(f"Нет открытого объема для SL по {symbol}")
+            return
+
+        # Получаем текущую цену и корректируем SL для Bybit
+        current_price = float(exchange.fetch_ticker(symbol)['last'])
+        if trade_type == 'long':
+            sl_trigger_price = min(float(buy_price), current_price * 0.999)
+        else:
+            sl_trigger_price = max(float(buy_price), current_price * 1.001)
+
+        # Округляем цену SL под точность рынка
+        market = exchange.market(symbol)
+        price_precision = market['precision']['price']
+        sl_trigger_price = round(sl_trigger_price, price_precision)
+
+        # Создаём новый SL
+        new_sl = exchange.create_order(
+            symbol=symbol,
+            type='market',
+            side=sl_side,
+            amount=amount,
+            params={
+                'stopLossPrice': sl_trigger_price,
+                'reduceOnly': True
+            }
+        )
+        print(
+            f"Стоп перенесён в безубыток: SL={sl_trigger_price} (buy_price={buy_price}, current_price={current_price}), ID={new_sl['id']}")
 
     except Exception as e:
         print(f"Ошибка переноса SL в безубыток для {symbol}: {e}")

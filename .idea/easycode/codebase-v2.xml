@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="com.obiscr.chatgpt.settings.EasyCodeState">
+    <option name="projectFiles" value="$PROJECT_DIR$/helper/calculate.py;/Users/repon/Desktop/work/repon/bb_bot/helper/data_parce.py;/Users/repon/Desktop/work/repon/bb_bot/helper/date_helper.py;/Users/repon/Desktop/work/repon/bb_bot/helper/design.py;/Users/repon/Desktop/work/repon/bb_bot/helper/json_helper.py;/Users/repon/Desktop/work/repon/bb_bot/helper/mongo.py;/Users/repon/Desktop/work/repon/bb_bot/old/config_old.json;/Users/repon/Desktop/work/repon/bb_bot/config.py;/Users/repon/Desktop/work/repon/bb_bot/data_fetcher.py;/Users/repon/Desktop/work/repon/bb_bot/indicators.py;/Users/repon/Desktop/work/repon/bb_bot/main.py;/Users/repon/Desktop/work/repon/bb_bot/orders.py;/Users/repon/Desktop/work/repon/bb_bot/README.md;/Users/repon/Desktop/work/repon/bb_bot/signals.py;/Users/repon/Desktop/work/repon/bb_bot/strategy.py;/Users/repon/Desktop/work/repon/bb_bot/telegram.py" />
+  </component>
+</project>

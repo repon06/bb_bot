@@ -2,7 +2,6 @@ import asyncio
 import time
 from datetime import datetime, timedelta, timezone
 
-# print("sys.path:", sys.path)
 import schedule
 
 import orders
@@ -33,11 +32,6 @@ def main():
     markets = {}
     signals_to_process = []
 
-    # symbol = SYMBOLS[0] + ":USDT"  # "TROY/USDT:USDT" "APE/USDT:USDT" "ADA/USDT:USDT"
-    # if not is_market_order_open(exchange, symbol):
-    #    test_open_long_swap(exchange, symbol)
-
-    # stat = check_order_statuses(exchange, 'BUBBLE/USDT', {'order': 1863352043419471104, 'stop_loss_order': 1863352055851388160})
     try:
         balance = exchange.fetch_balance()
         usdt_balance = balance['total']['USDT']

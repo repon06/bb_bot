@@ -71,24 +71,33 @@ def main():
                 signal['status']: 'found'
                 print(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
 
-                # если сигнал такой еще не обрабатывали - добавляем его в бд
-                if not db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price, 'direction': trade_type}):
-                    db_client_signals.insert_one(signal)  # add mongo
-                else:
-                    print(f"Сигнал по {symbol} с ценой {buy_price} уже обработан. Пропускаем открытие.")
-                    continue
+                # Проверяем, был ли такой сигнал
+                existing_signal = db_client_signals.find_one({
+                    'symbol': symbol,
+                    'buy_price': buy_price,
+                    'direction': trade_type
+                })
 
-                # Проверка на открытые ордера
-                if orders.check_open_orders(exchange, symbol):
-                    print(f"Для символа {red(symbol)} уже есть открытые сделки. Пропускаем открытие новой.")
-                    print(
-                        f"Found order: {db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})}")  # Поиск сигнала в БД
-                    orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type)
-                elif orders.check_closed_orders(exchange, symbol):
-                    print(
-                        f"Для символа {red(symbol)} уже были открытые сделки. Уже закрыты. Пропускаем открытие новой.")
-                elif date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
-                    # Открываем сделку/позицию с ТП и СЛ если свежий сигнал
+                if existing_signal:
+                    if orders.check_open_orders(exchange, symbol):
+                        print(orders.get_pnl(exchange, symbol))
+                        # Позиция ещё открыта — двигаем SL и не открываем заново
+                        print(f"Сигнал по {symbol} уже есть в БД и позиция открыта. Двигаем SL в безубыток.")
+                        orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type)
+                        continue
+                    elif orders.check_closed_orders(exchange, symbol):
+                        # Недавно закрыли — пропускаем
+                        print(f"Позиция по {symbol} была закрыта недавно. Пропуск.")
+                        continue
+                    else:
+                        # Сигнал есть, но позиции нет — можно открывать заново
+                        print(f"Сигнал по {symbol} уже был, но ордеров нет — открываем заново.")
+                else:
+                    # Если сигнала ещё нет в БД — добавляем
+                    db_client_signals.insert_one(signal)
+
+                # Если дошли сюда — можно открывать сделку если свежий сигнал
+                if date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
 
                     if order_ids:

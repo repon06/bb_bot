@@ -6,7 +6,7 @@ from typing import List
 import ccxt
 from deprecated import deprecated
 
-from config import LEVERAGE, TRADE_AMOUNT
+from config import LEVERAGE, TRADE_AMOUNT, IS_DEMO
 from helper.calculate import determine_trade_type
 from helper.design import red, green, yellow
 from helper.json_helper import get_error
@@ -1019,3 +1019,63 @@ def check_closed_orders(exchange, symbol, recent_ms=60_000):
             print(f"Последняя позиция по {symbol} закрыта недавно, пропуск.")
             return True
     return False
+
+
+def get_pnl(exchange, symbol):
+    positions = exchange.fetch_positions([symbol])
+    unrealized_pnl, roi, realized_pnl = 0, 0, 0
+
+    for pos in positions:
+        if pos['symbol'] == symbol:
+            unrealized_pnl = float(pos['unrealizedPnl'])
+            leverage = float(pos['leverage']) if pos['leverage'] else 1
+            position_value = float(pos['contracts']) * float(pos['entryPrice'])
+            initial_margin = position_value / leverage
+            roi = (unrealized_pnl / initial_margin) * 100 if initial_margin else 0
+
+    try:
+        closed_pnls = exchange.private_get_v5_position_closed_pnl(
+            {'symbol': symbol.replace("/", "")}
+        )
+        if 'result' in closed_pnls and 'list' in closed_pnls['result']:
+            realized_pnl = sum(float(p['closedPnl']) for p in closed_pnls['result']['list'])
+    except Exception:
+        # Fallback для демо — считаем вручную по трейдам
+        trades = exchange.fetch_my_trades(symbol)
+        realized_pnl = sum(float(t['realizedPnl']) for t in trades if 'realizedPnl' in t)
+
+    return {
+        'Unrealized P&L': unrealized_pnl,
+        'Unrealized ROI': roi,
+        'Realized P&L': realized_pnl
+    }
+
+
+def get_realized_pnl(exchange, symbol, entry_time):
+    """
+    Возвращает Realized P&L для символа.
+    Работает в реале через API Bybit, в демо считает вручную.
+    """
+    try:
+        if not IS_DEMO:
+            # Для реального счёта
+            closed_pnls = exchange.private_get_v5_position_closed_pnl(
+                {'symbol': symbol.replace("/", "")}
+            )
+            total_pnl = sum(float(p['closedPnl']) for p in closed_pnls['result']['list'])
+            return total_pnl
+        else:
+            # Для демо считаем вручную
+            trades = exchange.fetch_my_trades(symbol=symbol, since=entry_time)
+            total_pnl = 0.0
+            for t in trades:
+                # PnL = (Цена сделки - Цена входа) * кол-во * side
+                print("TODO: раскоментить")
+                # if t['side'] == 'sell':  # закрытие long
+                #    total_pnl += (t['price'] - entry_price) * t['amount']
+                # elif t['side'] == 'buy':  # закрытие short
+                #    total_pnl += (entry_price - t['price']) * t['amount']
+            return total_pnl
+    except Exception as e:
+        print(f"Ошибка получения Realized P&L для {symbol}: {e}")
+        return 0.0

@@ -80,7 +80,7 @@ def main():
 
                 if existing_signal:
                     if orders.check_open_orders(exchange, symbol):
-                        print(orders.get_pnl(exchange, symbol))
+                        # print(orders.get_pnl(exchange, symbol))
                         # Позиция ещё открыта — двигаем SL и не открываем заново
                         print(f"Сигнал по {symbol} уже есть в БД и позиция открыта. Двигаем SL в безубыток.")
                         orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type)

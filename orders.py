@@ -934,22 +934,20 @@ def move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type):
 
 def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
     """
-    Авто-перенос SL в безубыток после первого срабатывшего TP
+    Авто-перенос SL в безубыток после первого срабатывшего ТП
+    Работает для частично закрытых позиций: СЛ обновляется на цену входа
     """
     try:
-        market_symbol = symbol.replace("/", "").replace(":USDT", "USDT")
-
-        # 1. Определяем стороны для TP и SL
+        # Определяем стороны ордеров для TP и SL
         tp_side = 'sell' if trade_type == 'long' else 'buy'
         sl_side = 'sell' if trade_type == 'long' else 'buy'
 
-        # 2. Получаем закрытые ордера
+        # 1. Получаем закрытые ордера (для определения сработавших TP)
         closed_orders = exchange.fetch_closed_orders(symbol=symbol)
         first_tp = None
         for order in sorted(closed_orders, key=lambda o: o['timestamp']):
             # Ищем первый сработавший TP (reduceOnly=True)
-            if (order['side'] == tp_side and order.get('reduceOnly', False)
-                    and order['status'] in ('closed', 'canceled')):
+            if order['side'] == tp_side and order.get('reduceOnly', False) and order['status'] == 'closed':
                 first_tp = order
                 break
 
@@ -957,53 +955,59 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
             print(f"Перенос SL в безубыток не нужен — TP ещё не сработал для {symbol}")
             return
 
-        # 3. Проверка текущей цены перед переносом
-        ticker = exchange.fetch_ticker(symbol)
-        current_price = float(ticker['last'])
-        if trade_type == 'long' and buy_price >= current_price:
-            print(f"Пропуск: SL {buy_price} для лонга выше/равен текущей цене {current_price}")
-            return
-        elif trade_type == 'short' and buy_price <= current_price:
-            print(f"Пропуск: SL {buy_price} для шорта ниже/равен текущей цене {current_price}")
-            return
-
-        # 4. Получаем открытые ордера и ищем SL
+        # 2. Получаем все открытые ордера
         open_orders = exchange.fetch_open_orders(symbol=symbol)
+
+        # Ищем текущий SL среди открытых ордеров
         existing_sl = None
         for order in open_orders:
-            if (order['side'] == sl_side and order.get('reduceOnly', False)
-                    and float(order['stopPrice']) != float(buy_price)):
+            if order['side'] == sl_side and order.get('reduceOnly', False):
                 existing_sl = order
                 break
 
-        # 5. Если SL уже в безубытке — выходим
-        if existing_sl and float(existing_sl['stopPrice']) == float(buy_price):
+        # 3. Если SL уже на цене безубытка — выходим
+        if existing_sl and float(existing_sl.get('stopPrice', 0)) == float(buy_price):
             print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется.")
             return
 
-        # 6. Удаляем старый SL, если он есть
+        # 4. Удаляем старый SL, если он есть
         if existing_sl:
             exchange.cancel_order(existing_sl['id'], symbol=symbol)
-            print(f"Удалён старый SL ({existing_sl['stopPrice']}) для {symbol}")
+            print(f"Удалён старый SL ({existing_sl.get('stopPrice')}) для {symbol}")
 
-        # 7. Определяем количество
-        amount = existing_sl['amount'] if existing_sl else None
-        if amount is None:
+        # 5. Определяем количество для нового SL
+        amount = None
+        if existing_sl:
+            amount = float(existing_sl['amount'])
+        else:
+            # Берём текущую позицию, если SL не найден
             position = exchange.fetch_positions([symbol])[0]
             amount = abs(float(position['contracts']))
+            if amount == 0:
+                print(f"Позиция по {symbol} пустая, SL не создаём")
+                return
 
-        # 8. Создаём новый SL в безубыток
+        # 6. Получаем текущую цену
+        current_price = float(exchange.fetch_ticker(symbol)['last'])
+
+        # 7. Выбираем корректный sl_trigger_price для Bybit
+        if trade_type == 'long':
+            sl_trigger_price = min(float(buy_price), current_price * 0.999)
+        else:
+            sl_trigger_price = max(float(buy_price), current_price * 1.001)
+
+        # 8. Создаём новый SL на выбранной цене
         new_sl = exchange.create_order(
             symbol=symbol,
-            type='market',
+            type='market',  # рыночный SL через stopLossPrice
             side=sl_side,
             amount=amount,
             params={
-                'stopLossPrice': buy_price,
+                'stopLossPrice': sl_trigger_price,
                 'reduceOnly': True
             }
         )
-        print(f"Стоп перенесён в безубыток на {buy_price}, ID: {new_sl['id']}")
+        print(f"Стоп перенесён в безубыток: выбрана цена SL = {sl_trigger_price} (buy_price={buy_price}, current_price={current_price}), ID: {new_sl['id']}")
 
     except Exception as e:
         print(f"Ошибка переноса SL в безубыток для {symbol}: {e}")

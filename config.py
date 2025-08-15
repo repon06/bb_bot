@@ -20,9 +20,10 @@ API_KEYS = {
 # API ID и API Hash на https://my.telegram.org/auth
 tg_api_id = os.getenv("TG_API_ID")
 tg_api_hash = os.getenv("TG_API_HASH")
-tg_channel_name = '@MYH_System'  # имя канала
-tg_channel_insider_name = '@Insider_Trade'  # имя канала
-tg_channel_insider_id = -1001515215819  # '@Insider_Trade'  # имя канала
+tg_my_account = os.getenv("TG_MY_ACCOUNT")
+tg_channel_name = os.getenv("TG_CHANNEL_NAME")  # имя канала
+tg_channel_insider_name = os.getenv("TG_CHANNEL_INSIDER_NAME")  # имя канала
+tg_channel_insider_id = -1001515215819  # id канала
 session_name = 'session_name'
 session_insider_account = 'session_insider_account'
 
@@ -39,7 +40,7 @@ LEVERAGE = 20  # Плечо х20 кросс
 TIMEFRAME = "15m"  # 5
 DELTA = 6  # за сколько брать данные - до
 
-LAST_MESSAGE_COUNT = 15 # сколько последних сообщ чекать из ТГ канала
+LAST_MESSAGE_COUNT = 15  # сколько последних сообщ чекать из ТГ канала
 TIME_DElTA = 1500  # мин, сигнал за эту дельту не рассматривать
 TRADE_AMOUNT = 1000  # Сумма для покупки в USDT
 

@@ -85,6 +85,8 @@ def main():
                         # Позиция ещё открыта — двигаем SL и не открываем заново
                         print(f"Сигнал по {symbol} уже есть в БД и позиция открыта. Двигаем SL в безубыток.")
                         orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type)
+                        telegram.send_to_me(
+                            f"Сдвинули SL в безубыток по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}")
                         continue
                     elif orders.check_closed_orders(exchange, symbol):
                         # Недавно закрыли — пропускаем
@@ -100,6 +102,8 @@ def main():
                 # Если дошли сюда — можно открывать сделку если свежий сигнал
                 if date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
+                    telegram.send_to_me(
+                        f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}")
 
                     if order_ids:
                         db_order_id = db_client_orders.insert_one(order_ids)  # save order in db
@@ -150,31 +154,6 @@ def main():
                     db_client_signals.insert_one(signal)  # add mongo
             ################################################################
 
-    ################################################################
-    # symbol = 'GOMININGUSDT'  # 'POWRUSDT'
-    # symbol = check_symbol_exists(exchange, symbol)
-    # if symbol:
-    #     print(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
-    #
-    #     buy_price = 0.2883000
-    #     take_profits = [0.2914713, 0.2943543, 0.2972373, 0.3001203, 0.3030033]
-    #     stop_loss = 0.2735967
-    #
-    #     # Проверка на открытые ордера
-    #     if check_open_orders(exchange, symbol):
-    #         print(f"Для символа {red(symbol)} уже есть открытые сделки. Пропускаем открытие новой.")
-    #     else:
-    #         # Открываем сделку с ТП и СЛ
-    #         order_ids = open_order_with_tps_sl(exchange, symbol, buy_price, take_profits, stop_loss)
-    #
-    #         if order_ids:
-    #             print(f"Сделка открыта успешно, ID ордера: {order_ids}")
-    #
-    #             statuses = check_order_statuses(exchange, symbol, order_ids)
-    #             print("Статусы ордеров:", statuses)
-    #         else:
-    #             print("Не удалось открыть сделку.")
-    ################################################################
     for symbol, market in markets.items():  # for market in markets:
         # print("limits: " + print_dict(market['limits']))
         print(f"{red(symbol)} / {market['type']} / "
@@ -218,11 +197,11 @@ def safe_main():
         main()
     except Exception as e:
         print(f"[ОШИБКА] main(): {e}")
+        telegram.send_to_me(f"[ОШИБКА] main(): {e}")
         traceback.print_exc()
 
 
 if __name__ == "__main__":
-    asyncio.run(telegram.send_to_me(f"🚨 Ошибка в main: {'test'}"))
     safe_main()  # первый запуск сразу
     schedule.every(15).seconds.do(safe_main)  # периодический запуск
 

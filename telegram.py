@@ -186,7 +186,18 @@ async def check_and_get_tg_channel(client: TelegramClient, tg_name_find: str):
     return channel
 
 
-# Запуск асинхронной функции
+async def send_to_me(message: str):
+    """
+    Отправляет сообщение самому себе (в Saved Messages).
+    """
+    if not os.path.exists(f"{session_name}.session"):
+        logging.error("Сессия Telegram не найдена! Сначала авторизуйтесь.")
+        return
+
+    async with TelegramClient(session_name, tg_api_id, tg_api_hash) as client:
+        await client.send_message('me', message)
+
+
 if __name__ == "__main__":
     # signals = asyncio.run(get_tg_signal(limit=50))
     # logging.info(f"1) Получено {len(signals)} сигналов.")

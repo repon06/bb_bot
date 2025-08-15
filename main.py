@@ -1,5 +1,6 @@
 import asyncio
 import time
+import traceback
 from datetime import datetime, timedelta, timezone
 
 import schedule
@@ -212,10 +213,23 @@ def main():
     db_client_orders.close()
 
 
+def safe_main():
+    try:
+        main()
+    except Exception as e:
+        print(f"[ОШИБКА] main(): {e}")
+        traceback.print_exc()
+
+
 if __name__ == "__main__":
-    main()
-    schedule.every(15).seconds.do(main)
+    asyncio.run(telegram.send_to_me(f"🚨 Ошибка в main: {'test'}"))
+    safe_main()  # первый запуск сразу
+    schedule.every(15).seconds.do(safe_main)  # периодический запуск
 
     while True:
-        schedule.run_pending()
+        try:
+            schedule.run_pending()
+        except Exception as e:
+            print(f"[ОШИБКА] schedule.run_pending(): {e}")
+            traceback.print_exc()
         time.sleep(1)

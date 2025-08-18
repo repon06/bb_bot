@@ -88,7 +88,7 @@ def main():
                         continue
                     elif (orders.check_closed_orders(exchange, symbol)
                           or db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})):
-                        print(f"Позиция по {symbol} была закрыта недавно. Пропуск.")
+                        print(f"Позиция по {symbol} уже обработана. Пропуск.")
                         continue
                     else:
                         # Сигнал есть, но позиции нет — можно открывать заново

@@ -55,9 +55,9 @@ def main():
 
         for signal in signals_to_process:
             symbol = signal['symbol']
-            buy_price = signal['buy_price']  # float(signal['buy_price'])
-            take_profits = signal['take_profits']  # [float(tp) for tp in signal['take_profits']]
-            stop_loss = signal['stop_loss']  # float(signal['stop_loss'])
+            buy_price = signal['buy_price']
+            take_profits = signal['take_profits']
+            stop_loss = signal['stop_loss']
             trade_type = signal['direction']  # LONG/SHORT
             date = signal['date']
 
@@ -83,11 +83,11 @@ def main():
                     if orders.check_open_orders(exchange, symbol):
                         # print(orders.get_pnl(exchange, symbol))
                         # Позиция ещё открыта — двигаем SL и не открываем заново
-                        print(f"Сигнал по {symbol} уже есть в БД и позиция открыта. Двигаем SL в безубыток.")
-                        orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type)
+                        print(f"Сигнал по {symbol} уже есть в БД и позиция открыта.")
+                        orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal)
                         continue
-                    elif orders.check_closed_orders(exchange, symbol):
-                        # Недавно закрыли — пропускаем
+                    elif (orders.check_closed_orders(exchange, symbol)
+                          or db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})):
                         print(f"Позиция по {symbol} была закрыта недавно. Пропуск.")
                         continue
                     else:

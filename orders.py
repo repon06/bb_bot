@@ -1019,13 +1019,17 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
         print(f"Ошибка переноса SL в безубыток для {symbol}: {e}")
 
 
-def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
+def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal):
     """
     Авто-перенос SL в безубыток после первого срабатывшего TP.
     SL двигается только если первый TP сработал или оставшийся объем позиции меньше объема одного TP.
     Объем TP1 берется из ордеров на бирже.
+    existing_signal -- сигнал - смотрим по нему 1ТП и СЛ
     """
     try:
+        # сумма 1 ТП из сигнала
+        first_tp_price = existing_signal["take_profits"][0]
+
         tp_side = 'sell' if trade_type == 'long' else 'buy'
         sl_side = 'sell' if trade_type == 'long' else 'buy'
 
@@ -1033,18 +1037,50 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
         open_orders = exchange.fetch_open_orders(symbol=symbol)
         closed_orders = exchange.fetch_closed_orders(symbol=symbol)
 
-        # Определяем первый TP из открытых ордеров
-        tp_orders = [o for o in open_orders if o['side'] == tp_side and o.get('reduceOnly', False)]
-        tp_orders_sorted = sorted(tp_orders, key=lambda o: o.get('price') or o.get('stopPrice'))
-        first_tp_order = tp_orders_sorted[0] if tp_orders_sorted else None
+        # проверяем, остался ли ордер с этим ценником в открытых
+        first_tp_open = any(
+            (
+                    (o.get("stopPrice") == first_tp_price) or
+                    (o.get("triggerPrice") == first_tp_price) or
+                    (o.get("takeProfitPrice") == first_tp_price)
+            ) and o.get("reduceOnly", False)
+            for o in open_orders
+        )
+        # проверяем, остался ли ордер с этим ценником в закрытых
+        first_tp_closed = any(
+            (
+                    (o.get("stopPrice") == first_tp_price) or
+                    (o.get("triggerPrice") == first_tp_price) or
+                    (o.get("takeProfitPrice") == first_tp_price)
+            ) and o.get("status") == 'closed'
+            for o in closed_orders
+        )
+
+        # Определяем первый TP из открытых ордеров - он может быть не 1 ТП, а 2, 3 и тд
+        # tp_orders = [o for o in open_orders if o['side'] == tp_side and o.get('reduceOnly', False)]
+        # tp_orders_sorted = sorted(tp_orders, key=lambda o: o.get('price') or o.get('stopPrice'))
+        # first_tp_order = tp_orders_sorted[0] if tp_orders_sorted else None
+
+        # first_tp_order = 0  # TODO
+        first_tp_order = next((
+            o for o in closed_orders
+            if o.get("status") == 'closed' and (
+                o.get("stopPrice") == first_tp_price or
+                o.get("triggerPrice") == first_tp_price or
+                o.get("takeProfitPrice") == first_tp_price
+        )), None)
 
         # Проверяем, сработал ли первый TP
-        first_tp_closed = False
-        if first_tp_order:
-            for o in closed_orders:
-                if o['id'] == first_tp_order['id'] and o['status'] == 'closed':
-                    first_tp_closed = True
-                    break
+        # first_tp_closed = False
+        # if first_tp_order:
+        #    for o in closed_orders:
+        #        if o['id'] == first_tp_order['id'] and o['status'] == 'closed':
+        #            first_tp_closed = True
+        #            break
+
+        # Если ордера уже нет в открытых (значит сработал, но может не быть в closed_orders сразу)
+        # if not any(o['id'] == first_tp_order['id'] for o in open_orders):
+        #    first_tp_closed = True
 
         # Считаем текущий открытый объем позиции
         remaining_amount = sum(float(o['amount']) for o in open_orders if o.get('reduceOnly', False))
@@ -1052,8 +1088,9 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
 
         # Проверяем условие переноса SL
         if not first_tp_closed and remaining_amount >= tp_volume and tp_volume > 0:
-            print(f"SL не двигаем: первый TP не сработал и позиция полная (remaining_amount={remaining_amount})")
-            return
+            print(
+                f"SL по {symbol} не двигаем: первый TP не сработал и позиция полная (remaining_amount={remaining_amount})")
+        return
 
         # Ищем существующий SL
         existing_sl = None
@@ -1110,71 +1147,74 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
         asyncio.run(
             telegram.send_to_me(f"Ошибка переноса SL в безубыток для {symbol}: {e}"))
 
-    def check_closed_orders(exchange, symbol, recent_ms=60_000):
-        # Дополнительная проверка: недавно - (60 сек) закрытая позиция
-        closed_orders = exchange.fetch_closed_orders(symbol=symbol)
-        if closed_orders:
-            last_closed = sorted(closed_orders, key=lambda o: o['timestamp'])[-1]
-            # Можно поставить таймер или проверку условий, чтобы не входить сразу
-            if (time.time() * 1000) - last_closed['timestamp'] < recent_ms * 30:
-                print(f"Последняя позиция по {symbol} закрыта недавно, пропуск.")
-                return True
-        return False
 
-    def get_pnl(exchange, symbol):
-        positions = exchange.fetch_positions([symbol])
-        unrealized_pnl, roi, realized_pnl = 0, 0, 0
+def check_closed_orders(exchange, symbol, recent_ms=60_000):
+    # Дополнительная проверка: недавно - (60 сек) закрытая позиция
+    closed_orders = exchange.fetch_closed_orders(symbol=symbol)
+    if closed_orders:
+        last_closed = sorted(closed_orders, key=lambda o: o['timestamp'])[-1]
+        # Можно поставить таймер или проверку условий, чтобы не входить сразу
+        if (time.time() * 1000) - last_closed['timestamp'] < recent_ms * 30:
+            print(f"Последняя позиция по {symbol} закрыта недавно, пропуск.")
+            return True
+    return False
 
-        for pos in positions:
-            if pos['symbol'] == symbol:
-                unrealized_pnl = float(pos['unrealizedPnl'])
-                leverage = float(pos['leverage']) if pos['leverage'] else 1
-                position_value = float(pos['contracts']) * float(pos['entryPrice'])
-                initial_margin = position_value / leverage
-                roi = (unrealized_pnl / initial_margin) * 100 if initial_margin else 0
 
-        try:
+def get_pnl(exchange, symbol):
+    positions = exchange.fetch_positions([symbol])
+    unrealized_pnl, roi, realized_pnl = 0, 0, 0
+
+    for pos in positions:
+        if pos['symbol'] == symbol:
+            unrealized_pnl = float(pos['unrealizedPnl'])
+            leverage = float(pos['leverage']) if pos['leverage'] else 1
+            position_value = float(pos['contracts']) * float(pos['entryPrice'])
+            initial_margin = position_value / leverage
+            roi = (unrealized_pnl / initial_margin) * 100 if initial_margin else 0
+
+    try:
+        closed_pnls = exchange.private_get_v5_position_closed_pnl(
+            {'symbol': symbol.replace("/", "")}
+        )
+        if 'result' in closed_pnls and 'list' in closed_pnls['result']:
+            realized_pnl = sum(float(p['closedPnl']) for p in closed_pnls['result']['list'])
+    except Exception:
+        # Fallback для демо — считаем вручную по трейдам
+        trades = exchange.fetch_my_trades(symbol)
+        realized_pnl = sum(float(t['realizedPnl']) for t in trades if 'realizedPnl' in t)
+
+    return {
+        'Unrealized P&L': unrealized_pnl,
+        'Unrealized ROI': roi,
+        'Realized P&L': realized_pnl
+    }
+
+
+def get_realized_pnl(exchange, symbol, entry_time):
+    """
+    Возвращает Realized P&L для символа.
+    Работает в реале через API Bybit, в демо считает вручную.
+    """
+    try:
+        if not IS_DEMO:
+            # Для реального счёта
             closed_pnls = exchange.private_get_v5_position_closed_pnl(
                 {'symbol': symbol.replace("/", "")}
             )
-            if 'result' in closed_pnls and 'list' in closed_pnls['result']:
-                realized_pnl = sum(float(p['closedPnl']) for p in closed_pnls['result']['list'])
-        except Exception:
-            # Fallback для демо — считаем вручную по трейдам
-            trades = exchange.fetch_my_trades(symbol)
-            realized_pnl = sum(float(t['realizedPnl']) for t in trades if 'realizedPnl' in t)
-
-        return {
-            'Unrealized P&L': unrealized_pnl,
-            'Unrealized ROI': roi,
-            'Realized P&L': realized_pnl
-        }
-
-    def get_realized_pnl(exchange, symbol, entry_time):
-        """
-        Возвращает Realized P&L для символа.
-        Работает в реале через API Bybit, в демо считает вручную.
-        """
-        try:
-            if not IS_DEMO:
-                # Для реального счёта
-                closed_pnls = exchange.private_get_v5_position_closed_pnl(
-                    {'symbol': symbol.replace("/", "")}
-                )
-                total_pnl = sum(float(p['closedPnl']) for p in closed_pnls['result']['list'])
-                return total_pnl
-            else:
-                # Для демо считаем вручную
-                trades = exchange.fetch_my_trades(symbol=symbol, since=entry_time)
-                total_pnl = 0.0
-                for t in trades:
-                    # PnL = (Цена сделки - Цена входа) * кол-во * side
-                    print("TODO: раскоментить")
-                    # if t['side'] == 'sell':  # закрытие long
-                    #    total_pnl += (t['price'] - entry_price) * t['amount']
-                    # elif t['side'] == 'buy':  # закрытие short
-                    #    total_pnl += (entry_price - t['price']) * t['amount']
-                return total_pnl
-        except Exception as e:
-            print(f"Ошибка получения Realized P&L для {symbol}: {e}")
-            return 0.0
+            total_pnl = sum(float(p['closedPnl']) for p in closed_pnls['result']['list'])
+            return total_pnl
+        else:
+            # Для демо считаем вручную
+            trades = exchange.fetch_my_trades(symbol=symbol, since=entry_time)
+            total_pnl = 0.0
+            for t in trades:
+                # PnL = (Цена сделки - Цена входа) * кол-во * side
+                print("TODO: раскоментить")
+                # if t['side'] == 'sell':  # закрытие long
+                #    total_pnl += (t['price'] - entry_price) * t['amount']
+                # elif t['side'] == 'buy':  # закрытие short
+                #    total_pnl += (entry_price - t['price']) * t['amount']
+            return total_pnl
+    except Exception as e:
+        print(f"Ошибка получения Realized P&L для {symbol}: {e}")
+        return 0.0

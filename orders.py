@@ -415,7 +415,7 @@ def open_perpetual_order_by_signal(exchange, signal):
     open_perpetual_order_id = open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss,
                                                    trade_type=trade_type, current_price=current_price)
     asyncio.run(telegram.send_to_me(
-        f"Создан новый ордер по {signal['direction']} сигналу: {red(signal['symbol'])} на цену покупки {signal['buy_price']}"))
+        f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}"))
     return open_perpetual_order_id
 
 
@@ -1082,7 +1082,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         #    first_tp_closed = True
 
         # Считаем текущий открытый объем позиции
-        remaining_amount = sum(float(o['amount']) for o in open_orders if o.get('reduceOnly', False))
+        remaining_amount = sum(float(o['amount']) for o in open_orders if o.get('reduceOnly', False)) # TODO: надо ли вычислять и как?
         tp_volume = float(first_tp_order['amount']) if first_tp_order else 0
 
         # Проверяем условие переноса SL
@@ -1125,9 +1125,11 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         # Получаем текущую цену и корректируем SL для Bybit
         current_price = float(exchange.fetch_ticker(symbol)['last'])
         if trade_type == 'long':
-            sl_trigger_price = min(float(buy_price), current_price * 0.999)
+            #sl_trigger_price = min(float(buy_price), current_price * 0.999)
+            sl_trigger_price = buy_price
         else:
-            sl_trigger_price = max(float(buy_price), current_price * 1.001)
+            #sl_trigger_price = max(float(buy_price), current_price * 1.001)
+            sl_trigger_price =buy_price
 
         # Округляем цену SL под точность рынка
         # market = exchange.market(symbol)

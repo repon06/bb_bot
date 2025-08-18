@@ -73,12 +73,8 @@ def main():
                 print(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
 
                 # Проверяем, был ли такой сигнал
-                existing_signal = db_client_signals.find_one({
-                    'symbol': symbol,
-                    'buy_price': buy_price,
-                    'direction': trade_type
-                })
-
+                # existing_signal = db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price, 'direction': trade_type})
+                existing_signal = db_client_signals.find_signal(symbol, buy_price, trade_type)
                 if existing_signal:
                     if orders.check_open_orders(exchange, symbol):
                         # print(orders.get_pnl(exchange, symbol))
@@ -87,7 +83,8 @@ def main():
                         orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal)
                         continue
                     elif (orders.check_closed_orders(exchange, symbol)
-                          or db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})):
+                          # or db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})):
+                          or db_client_signals.find_signal(symbol, buy_price, trade_type)):
                         print(f"Позиция по {green(symbol)} уже обработана. Пропуск.")
                         continue
                     else:
@@ -95,14 +92,15 @@ def main():
                         print(f"Сигнал по {symbol} уже был, но ордеров нет — открываем заново.")
                 else:
                     # Если сигнала ещё нет в БД — добавляем
-                    db_client_signals.insert_one(signal)
+                    # db_client_signals.insert_one(signal)
+                    db_client_signals.insert_signal(signal)
 
                 # Если дошли сюда — можно открывать сделку если свежий сигнал
                 if date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
 
                     if order_ids:
-                        db_order_id = db_client_orders.insert_one(order_ids)  # save order in db
+                        db_order_id = db_client_orders.insert_order(order_ids)  # save order in db
                         order_general = {
                             'order_id': order_ids['order'],
                             'date_time': order_ids['date_time'],
@@ -134,7 +132,8 @@ def main():
                             })
                         db_orders.insert_many([order_general] + order_tps_sl)
                         print(
-                            f"Found order: {db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})}")  # Поиск сигнала
+                            # f"Found order: {db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})}")  # Поиск сигнала
+                            f"Found order: {db_client_signals.find_signal(symbol, buy_price, trade_type)}")  # Поиск сигнала
 
                         statuses = check_order_statuses(exchange, symbol, order_ids)
                         print("Статусы ордеров:", statuses)
@@ -146,8 +145,10 @@ def main():
             else:
                 signal['status']: 'not found'
                 symbol = signal['symbol']
-                if not db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price}):
-                    db_client_signals.insert_one(signal)  # add mongo
+                # if not db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price}):
+                if not db_client_signals.find_signal(symbol, buy_price, trade_type):
+                    # db_client_signals.insert_one(signal)  # add mongo
+                    db_client_signals.insert_signal(signal)  # add mongo
             ################################################################
 
     for symbol, market in markets.items():  # for market in markets:

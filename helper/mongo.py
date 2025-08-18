@@ -20,13 +20,13 @@ class MongoDBClient:
         self.db = self.client[db_name]
         self.collection = self.db[collection_name]
 
-    def insert_one(self, data):
+    def _insert_one(self, data):
         """Вставляет один документ в коллекцию."""
         result = self.collection.insert_one(data)
         logging.info(f"Inserted signal or order with symbol: {data} and ID: {result.inserted_id}")
         return result.inserted_id
 
-    def find_one(self, query):
+    def _find_one(self, query):
         """Ищет один документ, соответствующий запросу."""
         return self.collection.find_one(query)
 
@@ -63,3 +63,13 @@ class MongoDBClient:
         result = self.collection.insert_many(param)
         logging.info(f"Inserted signal or order with symbol: {param} and IDs: {result.inserted_ids}")
         return result.inserted_ids
+
+    # --- Специфичные методы для сигналов ---
+    def find_signal(self, symbol, buy_price, direction):
+        return self._find_one({'symbol': symbol, 'buy_price': buy_price, 'direction': direction})
+
+    def insert_signal(self, signal):
+        return self._insert_one(signal)
+
+    def insert_order(self, order):
+        return self._insert_one(order)

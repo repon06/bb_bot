@@ -408,7 +408,6 @@ def open_perpetual_order_by_signal(exchange, signal):
     market_symbol = signal['symbol']
     buy_price = signal['buy_price']
     take_profits = signal['take_profits']
-    # take_profits = [0.8058, 0.8565]
     stop_loss = signal['stop_loss']
     trade_type = signal['direction']  # LONG/SHORT
     current_price = signal['current_price']
@@ -416,7 +415,7 @@ def open_perpetual_order_by_signal(exchange, signal):
     open_perpetual_order_id = open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss,
                                                    trade_type=trade_type, current_price=current_price)
     asyncio.run(telegram.send_to_me(
-        f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}"))
+        f"Создан новый ордер по {signal['direction']} сигналу: {red(signal['symbol'])} на цену покупки {signal['buy_price']}"))
     return open_perpetual_order_id
 
 
@@ -455,7 +454,7 @@ def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_
             print(f"Слишком маленький ордер: {order_amount}, мин: {min_order_size}")
             return {}
 
-        print(f"Открываем {trade_type.upper()} на {order_amount} {green(market_symbol)} по цене {current_price}")
+        print(f"Открываем {red(trade_type.upper())} на {order_amount} {green(market_symbol)} по цене {current_price}")
 
         # Открытие позиции
         order = exchange.create_order(
@@ -1027,8 +1026,8 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
     existing_signal -- сигнал - смотрим по нему 1ТП и СЛ
     """
     try:
-        # сумма 1 ТП из сигнала
-        first_tp_price = existing_signal["take_profits"][0]
+        first_tp_price = existing_signal["take_profits"][0]  # сумма 1 ТП из сигнала
+        sl_price = existing_signal["stop_loss"]  # сумма СЛ
 
         tp_side = 'sell' if trade_type == 'long' else 'buy'
         sl_side = 'sell' if trade_type == 'long' else 'buy'
@@ -1090,14 +1089,23 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         if not first_tp_closed and remaining_amount >= tp_volume and tp_volume > 0:
             print(
                 f"SL по {symbol} не двигаем: первый TP не сработал и позиция полная (remaining_amount={remaining_amount})")
-        return
+            return
 
         # Ищем существующий SL
         existing_sl = None
-        for o in open_orders:
-            if o['side'] == sl_side and o.get('reduceOnly', False):
-                existing_sl = o
-                break
+        # for o in open_orders:
+        #    if o['side'] == sl_side and o.get('reduceOnly', False):
+        #        existing_sl = o
+        #        break
+
+        # ищем существующий СЛ - с ценой из сигнала или после перевода в безубыток - с ценой покупки
+        existing_sl = next((o for o in open_orders
+                            if (o.get("stopPrice") == sl_price or
+                                o.get("triggerPrice") == sl_price or
+                                o.get("takeProfitPrice") == sl_price)
+                            or (o.get("stopPrice") == buy_price or
+                                o.get("triggerPrice") == buy_price or
+                                o.get("takeProfitPrice") == buy_price)), None)
 
         if existing_sl and float(existing_sl.get('stopPrice', 0)) == float(buy_price):
             print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется.")
@@ -1122,9 +1130,9 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
             sl_trigger_price = max(float(buy_price), current_price * 1.001)
 
         # Округляем цену SL под точность рынка
-        market = exchange.market(symbol)
-        price_precision = market['precision']['price']
-        sl_trigger_price = round(sl_trigger_price, price_precision)
+        # market = exchange.market(symbol)
+        # price_precision = market['precision']['price']
+        # sl_trigger_price = round(sl_trigger_price, price_precision)
 
         # Создаём новый SL
         new_sl = exchange.create_order(

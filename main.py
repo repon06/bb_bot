@@ -64,7 +64,7 @@ def main():
             ticker = exchange.fetch_ticker(symbol, params={"type": "future"})
             current_price = ticker['last']
             signal['current_price'] = current_price
-            print(f"Текущая цена {symbol}: {current_price}, цена входа: {buy_price}")
+            print(f"Текущая цена {green(symbol)}: {current_price}, цена входа: {buy_price}")
 
             symbol = check_symbol_exists(exchange, symbol)  # TODO: надо ли указывать символ пары в таком виде?
             if symbol:
@@ -89,7 +89,7 @@ def main():
                         continue
                     else:
                         # Сигнал есть, но позиции нет — можно открывать заново
-                        print(f"Сигнал по {symbol} уже был, но ордеров нет — открываем заново.")
+                        print(f"Сигнал по {green(symbol)} уже был, но ордеров нет — открываем заново.")
                 else:
                     # Если сигнала ещё нет в БД — добавляем
                     # db_client_signals.insert_one(signal)

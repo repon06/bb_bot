@@ -85,7 +85,6 @@ def main():
                         # Позиция ещё открыта — двигаем SL и не открываем заново
                         print(f"Сигнал по {symbol} уже есть в БД и позиция открыта. Двигаем SL в безубыток.")
                         orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type)
-                        #TODO: asyncio.run(telegram.send_to_me(f"Сдвинули SL в безубыток по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}"))
                         continue
                     elif orders.check_closed_orders(exchange, symbol):
                         # Недавно закрыли — пропускаем
@@ -101,8 +100,6 @@ def main():
                 # Если дошли сюда — можно открывать сделку если свежий сигнал
                 if date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
-                    asyncio.run(telegram.send_to_me(
-                        f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}"))
 
                     if order_ids:
                         db_order_id = db_client_orders.insert_one(order_ids)  # save order in db

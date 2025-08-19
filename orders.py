@@ -1057,20 +1057,18 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
 
         # проверяем, остался ли ордер с этим ценником в открытых
         first_tp_open = any(
-            (
-                    (o.get("stopPrice") == first_tp_price) or
-                    (o.get("triggerPrice") == first_tp_price) or
-                    (o.get("takeProfitPrice") == first_tp_price)
-            ) and o.get("reduceOnly", False)
+            ((o.get("stopPrice") == first_tp_price) or
+             (o.get("triggerPrice") == first_tp_price) or
+             (o.get("takeProfitPrice") == first_tp_price)
+             ) and o.get("reduceOnly", False)
             for o in open_orders
         )
         # проверяем, остался ли ордер с этим ценником в закрытых
         first_tp_closed = any(
-            (
-                    (o.get("stopPrice") == first_tp_price) or
-                    (o.get("triggerPrice") == first_tp_price) or
-                    (o.get("takeProfitPrice") == first_tp_price)
-            ) and o.get("status") == 'closed'
+            ((o.get("stopPrice") == first_tp_price) or
+             (o.get("triggerPrice") == first_tp_price) or
+             (o.get("takeProfitPrice") == first_tp_price)
+             ) and o.get("status") == 'closed'
             for o in closed_orders
         )
 

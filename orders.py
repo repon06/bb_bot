@@ -473,6 +473,8 @@ def open_perpetual_order(exchange, market_symbol, buy_price,
         )
 
         print(f"Открыт {red(trade_type.upper())} на {order_amount} {green(market_symbol)} по цене {current_price}!")
+        asyncio.run(telegram.send_to_me(
+            f"Открыт {red(trade_type.upper())} на {order_amount} {green(market_symbol)} по цене {current_price}!"))
 
         order_ids = {'symbol': market_symbol, 'order': order['id'], 'take_profits': [], 'stop_loss': None}
 
@@ -732,14 +734,14 @@ def set_stop_loss_perpetual(exchange, market_symbol, trade_type, order_amount, s
     try:
         sl_order = exchange.create_order(
             symbol=market_symbol,
-            type='market',  # Bybit воспринимает как стоп-ордер через параметры
+            type='stop',  # TODO поменяли 'market',  # Bybit воспринимает как стоп-ордер через параметры
             side=side,
             amount=order_amount,
             price=None,
             params={
                 'stopPrice': stop_loss,
                 'triggerDirection': trigger_direction,
-                'reduce_only': True,
+                'reduceOnly': True,
                 'closeOnTrigger': True,
                 'category': 'linear',
                 'timeInForce': 'GoodTillCancel',
@@ -747,6 +749,7 @@ def set_stop_loss_perpetual(exchange, market_symbol, trade_type, order_amount, s
             }
         )
         print(f"Стоп-лосс установлен на {stop_loss}, ID: {sl_order['id']}")
+        asyncio.run(telegram.send_to_me(f"Стоп-лосс установлен на {stop_loss}, ID: {sl_order['id']}"))
         return sl_order['id']
     except Exception as e:
         print(f"Ошибка установки стоп-лосса: {e}")
@@ -906,6 +909,7 @@ def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount
             )
             order_ids.append(tp_order['id'])
             print(f"Тейк-профит установлен на {tp_price}, ID ордера: {tp_order['id']}")
+            asyncio.run(telegram.send_to_me(f"Тейк-профит установлен на {tp_price}, ID ордера: {tp_order['id']}"))
         except Exception as e:
             print(f"Ошибка при установке тейк-профита на {tp_price}: {e}")
 
@@ -1149,11 +1153,12 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         # Создаём новый SL
         new_sl = exchange.create_order(
             symbol=symbol,
-            type='market',
+            type='stop',  # TODO поменяли 'market',
             side=sl_side,
             amount=amount,
             params={
                 'stopLossPrice': sl_trigger_price,
+                'stopPrice': sl_trigger_price,
                 'reduceOnly': True,
                 'orderLinkId': "SL"
             }

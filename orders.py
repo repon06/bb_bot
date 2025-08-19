@@ -1039,6 +1039,22 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         open_orders = exchange.fetch_open_orders(symbol=symbol)
         closed_orders = exchange.fetch_closed_orders(symbol=symbol)
 
+        # Проверяем наличие основного ордера (по цене входа и направлению)
+        main_order = next(
+            (order for order in open_orders
+             if not order.get("reduceOnly", False)
+             and order['side'] == ('buy' if trade_type == 'long' else 'sell')),
+            None
+        )
+        if not main_order:
+            # Основного ордера нет — закрываем все TP и SL
+            print("Основной ордер отсутствует, TP/SL будут закрыты")
+            for order in open_orders:
+                if order.get("reduceOnly", False):
+                    exchange.cancel_order(order['id'], symbol)
+                    print(f"Отменен TP/SL {order['id']} для {symbol} — основной ордер исчез")
+            return  # дальше перенос SL не нужен
+
         # проверяем, остался ли ордер с этим ценником в открытых
         first_tp_open = any(
             (

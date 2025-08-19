@@ -11,10 +11,13 @@ from config import session_name, tg_api_id, tg_api_hash, tg_channel_name, sessio
     LOGGING, tg_channel_insider_id
 
 # Настраиваем логирование
-logging.basicConfig(level=logging.INFO, handlers=[
-    logging.FileHandler("bot.log", mode="a", encoding="utf-8"),
-    logging.StreamHandler()
-])
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("bot.log", mode="a", encoding="utf-8"),
+        logging.StreamHandler()
+    ])
 
 # Регулярное выражение для парсинга сообщения с сигналом
 # signal_pattern = r"⚡.*?New Signal\s#([\w-]+)\s+.*\n\s*`?\s*Buy:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP1:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP2:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP3:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP4:\s*`?\s*([\d.]+)\s*\n\s*`?\s*TP5:\s*`?\s*([\d.]+)\s*\n\s*`?\s*STL:\s*`?\s*([\d.]+)"

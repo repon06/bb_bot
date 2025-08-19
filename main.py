@@ -103,13 +103,14 @@ def main():
                     else:
                         # Сигнал есть, но позиции нет — можно открывать заново
                         logging.info(f"Сигнал по {green(symbol)} уже был, но ордеров нет — открываем заново.")
-                else:
-                    # Если сигнала ещё нет в БД — добавляем
-                    db_client_signals.insert_signal(signal)
+                # else:# Если сигнала ещё нет в БД — добавляем
 
                 # Если дошли сюда — можно открывать сделку если свежий сигнал
                 if date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
+
+                    # Если сигнала ещё нет в БД — добавляем
+                    db_client_signals.insert_signal(signal)
 
                     if order_ids:
                         db_order_id = db_client_orders.insert_order(order_ids)  # save order in db

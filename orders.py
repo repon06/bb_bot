@@ -678,9 +678,10 @@ def check_open_orders(exchange, symbol):
         if open_orders:
             print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров.")
             for open_order in open_orders:
-                _type = get_order_type(open_order['symbol'], open_order['triggerPrice'])
+                __type = open_order['info'].get('stopOrderType', '').lower()
+                _type = get_order_type(open_order['symbol'], open_order['triggerPrice']) #'stopOrderType'
                 print(
-                    f"    {open_order['id']}: {open_order['type']}, {_type}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
+                    f"    {open_order['id']}: {open_order['type']}, {__type}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
             return True
         else:
             print(f"Нет открытых ордеров для {symbol}.")
@@ -1040,15 +1041,15 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         closed_orders = exchange.fetch_closed_orders(symbol=symbol)
 
         # Проверяем наличие основного ордера (по цене входа и направлению)
-        main_order = next(
-            (order for order in open_orders
-             if not order.get("reduceOnly", False)
-             and order['side'] == ('buy' if trade_type == 'long' else 'sell')),
-            None
-        )
+        # основного ордера не бывает в fetch_open_orders, там только СЛ/ТП
+        positions = exchange.fetch_positions([symbol])
+        main_order = next((p for p in positions if float(p['contracts']) > 0), None)
+
         if not main_order:
             # Основного ордера нет — закрываем все TP и SL
-            print("Основной ордер отсутствует, TP/SL будут закрыты")
+            print(f"Основной ордер {symbol} отсутствует, TP/SL будут закрыты")
+            asyncio.run(telegram.send_to_me(f"Основной ордер {symbol} отсутствует, TP/SL будут закрыты"))
+
             for order in open_orders:
                 if order.get("reduceOnly", False):
                     exchange.cancel_order(order['id'], symbol)

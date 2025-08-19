@@ -3,14 +3,18 @@ import logging
 from pymongo import MongoClient
 
 # Настраиваем логирование
-logging.basicConfig(level=logging.INFO, handlers=[
-    logging.FileHandler("bot.log", mode="a", encoding="utf-8"),
-    logging.StreamHandler()
-])
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("bot.log", mode="a", encoding="utf-8"),
+        logging.StreamHandler()
+    ])
 
 
 def get_order_type(symbol, price):
-    return MongoDBClient(db_name='crypto', collection_name='orders_general').find_open_orders(symbol, price)['type']
+    open_order = MongoDBClient(db_name='crypto', collection_name='orders_general').find_open_orders(symbol, price)
+    return open_order['type'] if open_order is not None else None
 
 
 class MongoDBClient:

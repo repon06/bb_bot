@@ -200,7 +200,7 @@ def safe_main():
 
 if __name__ == "__main__":
     safe_main()  # первый запуск сразу
-    schedule.every(15).seconds.do(safe_main)  # периодический запуск
+    schedule.every(10).seconds.do(safe_main)  # периодический запуск
 
     while True:
         try:

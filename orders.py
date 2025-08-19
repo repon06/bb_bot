@@ -12,6 +12,7 @@ from config import LEVERAGE, TRADE_AMOUNT, IS_DEMO
 from helper.calculate import determine_trade_type
 from helper.design import red, green, yellow
 from helper.json_helper import get_error
+from helper.mongo import get_order_type
 
 
 def open_position(exchange, symbol, side, amount):
@@ -677,8 +678,9 @@ def check_open_orders(exchange, symbol):
         if open_orders:
             print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров.")
             for open_order in open_orders:
+                _type = get_order_type(open_order['symbol'], open_order['triggerPrice'])
                 print(
-                    f"    {open_order['id']}: {open_order['type']}, тп/сл: {open_order['reduceOnly']}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
+                    f"    {open_order['id']}: {open_order['type']}, {_type}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
             return True
         else:
             print(f"Нет открытых ордеров для {symbol}.")
@@ -1028,6 +1030,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
     try:
         first_tp_price = existing_signal["take_profits"][0]  # сумма 1 ТП из сигнала
         sl_price = existing_signal["stop_loss"]  # сумма СЛ
+        current_price = float(exchange.fetch_ticker(symbol)['last'])
 
         tp_side = 'sell' if trade_type == 'long' else 'buy'
         sl_side = 'sell' if trade_type == 'long' else 'buy'
@@ -1082,7 +1085,8 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         #    first_tp_closed = True
 
         # Считаем текущий открытый объем позиции
-        remaining_amount = sum(float(o['amount']) for o in open_orders if o.get('reduceOnly', False)) # TODO: надо ли вычислять и как?
+        remaining_amount = sum(
+            float(o['amount']) for o in open_orders if o.get('reduceOnly', False))  # TODO: надо ли вычислять и как?
         tp_volume = float(first_tp_order['amount']) if first_tp_order else 0
 
         # Проверяем условие переноса SL
@@ -1098,7 +1102,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         #        existing_sl = o
         #        break
 
-        # ищем существующий СЛ - с ценой из сигнала или после перевода в безубыток - с ценой покупки
+        # ищем существующий СЛ - с ценой из сигнала или после перевода в безубыток (ценой покупки)
         existing_sl = next((o for o in open_orders
                             if (o.get("stopPrice") == sl_price or
                                 o.get("triggerPrice") == sl_price or
@@ -1111,25 +1115,21 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
             print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется.")
             return
 
-        # Удаляем старый SL, если есть
-        if existing_sl:
-            exchange.cancel_order(existing_sl['id'], symbol=symbol)
-            print(f"Удалён старый SL ({existing_sl.get('stopPrice')}) для {symbol}")
-
         # Определяем количество для нового SL
         amount = existing_sl['amount'] if existing_sl else remaining_amount
         if amount == 0:
             print(f"Нет открытого объема для SL по {symbol}")
             return
 
-        # Получаем текущую цену и корректируем SL для Bybit
-        current_price = float(exchange.fetch_ticker(symbol)['last'])
-        if trade_type == 'long':
-            #sl_trigger_price = min(float(buy_price), current_price * 0.999)
-            sl_trigger_price = buy_price
-        else:
-            #sl_trigger_price = max(float(buy_price), current_price * 1.001)
-            sl_trigger_price =buy_price
+        # корректируем SL для Bybit
+
+        # if trade_type == 'long':
+        # sl_trigger_price = min(float(buy_price), current_price * 0.999)
+        # sl_trigger_price = buy_price
+        # else:
+        # sl_trigger_price = max(float(buy_price), current_price * 1.001)
+        # sl_trigger_price = buy_price
+        sl_trigger_price = buy_price
 
         # Округляем цену SL под точность рынка
         # market = exchange.market(symbol)
@@ -1147,15 +1147,102 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
                 'reduceOnly': True
             }
         )
+
+        # Удаляем старый SL, если существует. И удаляем после создания нового СЛ - тк если упадет при создании, то старый не удалится
+        if existing_sl:
+            exchange.cancel_order(existing_sl['id'], symbol=symbol)
+            print(f"Удалён старый SL ({existing_sl.get('stopPrice')}) для {symbol}")
+
         print(
             f"Стоп перенесён в безубыток: SL={sl_trigger_price} (buy_price={buy_price}, current_price={current_price}), ID={new_sl['id']}")
         asyncio.run(
             telegram.send_to_me(f"Сдвинули SL в безубыток по {trade_type} сигналу: {symbol} на {sl_trigger_price}"))
 
     except Exception as e:
-        print(f"Ошибка переноса SL в безубыток для {symbol}: {e}")
+        print(f"Ошибка переноса {trade_type} SL в безубыток для {symbol}: {e}")
         asyncio.run(
-            telegram.send_to_me(f"Ошибка переноса SL в безубыток для {symbol}: {e}"))
+            telegram.send_to_me(f"Ошибка переноса {trade_type} SL в безубыток для {symbol}: {e}"))
+
+
+def __auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal, mode="breakeven"):
+    """
+    Авто-перенос SL:
+    - mode="breakeven": переносим стоп в цену входа после TP1.
+    - mode="trailing": двигаем стоп по мере достижения каждого TP (на предыдущий TP).
+    """
+
+    try:
+        take_profits = existing_signal["take_profits"]
+        sl_price = existing_signal["stop_loss"]
+
+        # Получаем ордера
+        open_orders = exchange.fetch_open_orders(symbol=symbol)
+        closed_orders = exchange.fetch_closed_orders(symbol=symbol)
+
+        # Определяем, какой TP уже сработал
+        tp_hit_index = None
+        for i, tp_price in enumerate(take_profits):
+            tp_filled = any(
+                (o.get("stopPrice") in (tp_price, buy_price) or
+                 o.get("triggerPrice") in (tp_price, buy_price) or
+                 o.get("takeProfitPrice") in (tp_price, buy_price)) and o.get("status") == "closed"
+                for o in closed_orders
+            )
+            if tp_filled:
+                tp_hit_index = i
+            else:
+                break
+
+        if tp_hit_index is None:
+            print(f"По {symbol} ещё не сработал ни один TP — стоп не двигаем.")
+            return
+
+        # Определяем новую цену SL
+        if mode == "breakeven":
+            new_sl_price = buy_price  # всегда безубыток
+        elif mode == "trailing":
+            if tp_hit_index == 0:
+                new_sl_price = buy_price
+            else:
+                new_sl_price = take_profits[tp_hit_index - 1]  # предыдущий TP
+        else:
+            print(f"Неизвестный режим {mode}")
+            return
+
+        # Проверяем, есть ли уже такой SL
+        existing_sl = next((o for o in open_orders
+                            if float(o.get("stopPrice", 0)) == float(new_sl_price)), None)
+
+        if existing_sl:
+            print(f"SL уже установлен на {new_sl_price} для {symbol}")
+            return
+
+        # Считаем объём
+        amount = sum(float(o["amount"]) for o in open_orders if o.get("reduceOnly", False))
+        if amount == 0:
+            print(f"Нет объёма для установки SL по {symbol}")
+            return
+
+        # Ставим новый SL
+        sl_side = "sell" if trade_type == "long" else "buy"
+        new_sl = exchange.create_order(
+            symbol=symbol,
+            type="market",
+            side=sl_side,
+            amount=amount,
+            params={"stopLossPrice": new_sl_price, "reduceOnly": True}
+        )
+
+        # Удаляем старый SL
+        old_sl = next((o for o in open_orders if o.get("stopPrice")), None)
+        if old_sl:
+            exchange.cancel_order(old_sl["id"], symbol=symbol)
+            print(f"Удалён старый SL {old_sl.get('stopPrice')} для {symbol}")
+
+        print(f"SL перенесён на {new_sl_price} для {symbol}, ID={new_sl['id']}")
+
+    except Exception as e:
+        print(f"Ошибка переноса SL для {symbol}: {e}")
 
 
 def check_closed_orders(exchange, symbol, recent_ms=60_000):

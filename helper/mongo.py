@@ -6,6 +6,10 @@ from pymongo import MongoClient
 logging.basicConfig(level=logging.INFO)
 
 
+def get_order_type(symbol, price):
+    return MongoDBClient(db_name='crypto', collection_name='orders_general').find_open_orders(symbol, price)['type']
+
+
 class MongoDBClient:
     def __init__(self, db_name, collection_name, host='localhost', port=27017):
         """
@@ -67,6 +71,9 @@ class MongoDBClient:
     # --- Специфичные методы для сигналов ---
     def find_signal(self, symbol, buy_price, direction):
         return self._find_one({'symbol': symbol, 'buy_price': buy_price, 'direction': direction})
+
+    def find_open_orders(self, symbol, price):
+        return self._find_one({'symbol': symbol, 'price': price})
 
     def insert_signal(self, signal):
         return self._insert_one(signal)

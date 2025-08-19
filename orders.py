@@ -12,7 +12,6 @@ from config import LEVERAGE, TRADE_AMOUNT, IS_DEMO
 from helper.calculate import determine_trade_type
 from helper.design import red, green, yellow
 from helper.json_helper import get_error
-from helper.mongo import get_order_type
 
 
 def open_position(exchange, symbol, side, amount):
@@ -406,6 +405,9 @@ def is_market_order_open(exchange, symbol: str):
 
 
 def open_perpetual_order_by_signal(exchange, signal):
+    """
+    Открывает фьючерсную (Perpetual) сделку на Bybit с ТП и СЛ.
+    """
     market_symbol = signal['symbol']
     buy_price = signal['buy_price']
     take_profits = signal['take_profits']
@@ -415,8 +417,7 @@ def open_perpetual_order_by_signal(exchange, signal):
 
     open_perpetual_order_id = open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss,
                                                    trade_type=trade_type, current_price=current_price)
-    asyncio.run(telegram.send_to_me(
-        f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}"))
+
     return open_perpetual_order_id
 
 
@@ -678,10 +679,10 @@ def check_open_orders(exchange, symbol):
         if open_orders:
             print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров.")
             for open_order in open_orders:
-                __type = open_order['info'].get('stopOrderType', '').lower()
-                _type = get_order_type(open_order['symbol'], open_order['triggerPrice']) #'stopOrderType'
+                _type = open_order['info'].get('stopOrderType', '').lower()
+                # _type = get_order_type(open_order['symbol'], open_order['triggerPrice']) #'stopOrderType'
                 print(
-                    f"    {open_order['id']}: {open_order['type']}, {__type}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
+                    f"    {open_order['id']}: {open_order['type']}, {_type}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
             return True
         else:
             print(f"Нет открытых ордеров для {symbol}.")
@@ -1078,7 +1079,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         # tp_orders_sorted = sorted(tp_orders, key=lambda o: o.get('price') or o.get('stopPrice'))
         # first_tp_order = tp_orders_sorted[0] if tp_orders_sorted else None
 
-        # first_tp_order = 0  # TODO
+        # определяем первый ТП из закрытых ордеров
         first_tp_order = next((
             o for o in closed_orders
             if o.get("status") == 'closed' and (
@@ -1102,10 +1103,10 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         # Считаем текущий открытый объем позиции
         remaining_amount = sum(
             float(o['amount']) for o in open_orders if o.get('reduceOnly', False))  # TODO: надо ли вычислять и как?
-        tp_volume = float(first_tp_order['amount']) if first_tp_order else 0
+        #tp_volume = float(first_tp_order['amount']) if first_tp_order else 0
 
         # Проверяем условие переноса SL
-        if not first_tp_closed and remaining_amount >= tp_volume and tp_volume > 0:
+        if not first_tp_closed: # and remaining_amount >= tp_volume and tp_volume > 0:
             print(
                 f"SL по {symbol} не двигаем: первый TP не сработал и позиция полная (remaining_amount={remaining_amount})")
             return

@@ -23,8 +23,7 @@ logging.basicConfig(
     handlers=[
         logging.FileHandler("bot.log", mode="a", encoding="utf-8"),
         logging.StreamHandler()
-    ]
-)
+    ])
 
 
 def main():
@@ -81,11 +80,11 @@ def main():
                 signal['status']: 'found'
                 logging.info(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
 
-                # анализ сделок
-                logging.info(f"Анализ закрытых ордеров {yellow(symbol)}:")
-                for r in orders.analyze_closed_orders(exchange, signal):
-                    # for r in orders.analyze_closed_orders_with_pnl(exchange, signal):
-                    logging.info(f"    {r}")
+                # анализ сделок TODO: пока отключил
+                # logging.info(f"Анализ закрытых ордеров {yellow(symbol)}:")
+                # for r in orders.analyze_closed_orders(exchange, signal):
+                # for r in orders.analyze_closed_orders_with_pnl(exchange, signal):
+                #    logging.info(f"    {r}")
 
                 # Проверяем, был ли такой сигнал
                 existing_signal = db_client_signals.find_signal(symbol, buy_price, trade_type)
@@ -108,7 +107,10 @@ def main():
                 # Если дошли сюда — можно открывать сделку если свежий сигнал
                 if date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
-
+                    asyncio.run(telegram.send_to_me(
+                        f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}"))
+                    logging.info(
+                        f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}")
                     # Если сигнала ещё нет в БД — добавляем
                     db_client_signals.insert_signal(signal)
 

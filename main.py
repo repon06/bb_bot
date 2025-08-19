@@ -32,8 +32,8 @@ def main():
     db_client_orders = MongoDBClient(db_name='crypto', collection_name='orders')
     db_orders = MongoDBClient(db_name='crypto', collection_name='orders_general')
 
-    signals_documents = db_client_signals.get_all_documents()
-    orders_documents = db_client_orders.get_all_documents()
+    # signals_documents = db_client_signals.get_all_documents()
+    # orders_documents = db_client_orders.get_all_documents()
     # logging.info(f"Удалено документов: {db_client_signals.delete_many({})}")
 
     usdt_balance = 0.0
@@ -51,7 +51,7 @@ def main():
         logging.info("Error:", get_error(e))
 
     # сигнал из файла
-    signal_from_file = None  # TODO: пока убрал parse_trade_signals(signals_text)  # from file
+    signal_from_file = None  # TODO: пока убрал # parse_trade_signals(signals_text)  # from file
     # сигналы из телеги
     # signals_from_tg = asyncio.run(telegram.get_tg_signal(limit=300))
     signals_from_tg = asyncio.run(
@@ -77,7 +77,7 @@ def main():
             symbol = check_symbol_exists(exchange, symbol)
             if symbol:
                 signal['symbol'] = symbol
-                signal['status']: 'found'
+                # signal['status']: 'found'
                 logging.info(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
 
                 # анализ сделок TODO: пока отключил
@@ -134,7 +134,7 @@ def main():
                                 'order_id': order_ids['take_profits'][i],
                                 'date_time': order_ids['date_time'],
                                 'symbol': order_ids['symbol'],
-                                'type': 'tp' + i + 1,
+                                'type': f"tp{i + 1}",
                                 'status': 'open',
                                 'parent': order_ids['order'],
                                 'price': tp

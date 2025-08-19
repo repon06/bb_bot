@@ -415,11 +415,10 @@ def open_perpetual_order_by_signal(exchange, signal):
     trade_type = signal['direction']  # LONG/SHORT
     current_price = signal['current_price']
 
-    open_perpetual_order_id = open_perpetual_order(exchange, market_symbol,
-                                                   buy_price, take_profits, stop_loss,
-                                                   trade_type=trade_type, current_price=current_price)
-
-    return open_perpetual_order_id
+    open_order = open_perpetual_order(exchange, market_symbol,
+                                      buy_price, take_profits, stop_loss,
+                                      trade_type=trade_type, current_price=current_price)
+    return open_order
 
 
 def open_perpetual_order(exchange, market_symbol, buy_price,
@@ -672,17 +671,18 @@ def check_open_orders(exchange, symbol):
     symbol -- строка в формате 'GOMINING/USDT'
 
     Возвращает:
-    bool -- True, если есть открытые ордера для этого символа, иначе False
+    bool -- True, если есть откр ордера для этого символа, иначе False
     """
     try:
         open_orders = exchange.fetch_open_orders(symbol)
         if open_orders:
             print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров")
             for open_order in open_orders:
-                _type = open_order['info'].get('stopOrderType', '').lower()
+                # _type = open_order['info'].get('stopOrderType', '').lower()
+                _type = open_order['info'].get('createType', '').lower()
                 # _type = get_order_type(open_order['symbol'], open_order['triggerPrice']) #'stopOrderType'
                 print(
-                    f"    {open_order['id']}: {open_order['type']}, {_type}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
+                    f"    {open_order['id']}: {_type}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
             return True
         else:
             print(f"Нет открытых ордеров для {symbol}")
@@ -745,7 +745,8 @@ def set_stop_loss_perpetual(exchange, market_symbol, trade_type, order_amount, s
                 'reduce_only': True,
                 'closeOnTrigger': True,
                 'category': 'linear',
-                'timeInForce': 'GoodTillCancel'
+                'timeInForce': 'GoodTillCancel',
+                'orderLinkId': "SL"
             }
         )
         print(f"Стоп-лосс установлен на {stop_loss}, ID: {sl_order['id']}")
@@ -888,7 +889,7 @@ def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount
     side = 'sell' if trade_type == 'long' else 'buy'
     trigger_direction = "above" if trade_type == 'long' else "below"
 
-    for tp_price in take_profits:
+    for idx, tp_price in take_profits:
         try:
             tp_order = exchange.create_order(
                 symbol=market_symbol,
@@ -902,7 +903,8 @@ def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount
                     'reduce_only': True,
                     'closeOnTrigger': True,
                     'category': 'linear',
-                    'timeInForce': 'GoodTillCancel'
+                    'timeInForce': 'GoodTillCancel',
+                    'orderLinkId': f"TP{idx + 1}"
                 }
             )
             order_ids.append(tp_order['id'])
@@ -1155,7 +1157,8 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
             amount=amount,
             params={
                 'stopLossPrice': sl_trigger_price,
-                'reduceOnly': True
+                'reduceOnly': True,
+                'orderLinkId': "SL"
             }
         )
 

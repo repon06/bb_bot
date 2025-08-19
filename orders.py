@@ -679,10 +679,10 @@ def check_open_orders(exchange, symbol):
             print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров")
             for open_order in open_orders:
                 # _type = open_order['info'].get('stopOrderType', '').lower()
-                _type = open_order['info'].get('createType', '').lower()
+                #_type = open_order['info'].get('createType', '').lower()
                 # _type = get_order_type(open_order['symbol'], open_order['triggerPrice']) #'stopOrderType'
                 print(
-                    f"    {open_order['id']}: {_type}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
+                    f"    {open_order['id']}: {open_order['clientOrderId']}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
             return True
         else:
             print(f"Нет открытых ордеров для {symbol}")
@@ -889,7 +889,7 @@ def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount
     side = 'sell' if trade_type == 'long' else 'buy'
     trigger_direction = "above" if trade_type == 'long' else "below"
 
-    for idx, tp_price in take_profits:
+    for idx, tp_price in enumerate(take_profits):
         try:
             tp_order = exchange.create_order(
                 symbol=market_symbol,

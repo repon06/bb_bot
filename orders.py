@@ -1389,3 +1389,104 @@ def analyze_closed_orders(exchange, signal):
         results.append(grouped_entry)
 
     return results
+
+
+def analyze_closed_orders_with_pnl(exchange, signal):
+    """
+    Анализирует закрытые ордера по сигналу:
+    - классифицирует entry/tp/sl/sl_breakeven
+    - считает PnL (в USDT) и ROI %
+    - возвращает детализированный список и сводку
+    """
+    closed_orders = exchange.fetch_closed_orders(symbol=signal["symbol"])
+
+    buy_price = float(signal["buy_price"])
+    take_profits = [float(tp) for tp in signal["take_profits"]]
+    stop_loss = float(signal["stop_loss"])
+    direction = signal.get("direction", "long")  # "long" или "short"
+
+    entry_orders = []
+    results = []
+    total_pnl = 0.0
+    total_invested = 0.0
+
+    for o in closed_orders:
+        # order_id = o.get("id")
+        avg = float(o.get("average") or 0)
+        stop_price = float(o.get("stopPrice") or 0)
+        trigger_price = float(o.get("triggerPrice") or 0)
+        tp_price = float(o.get("takeProfitPrice") or 0)
+        side = o.get("side")
+        status = o.get("status")
+        amount = float(o.get("amount", 0))
+        reason = "unknown"
+
+        # Вход
+        if abs(avg - buy_price) < buy_price * 0.002:
+            reason = "entry"
+            entry_orders.append(o)
+            total_invested += amount * buy_price
+
+        # Стоп-лосс
+        elif stop_price == stop_loss or trigger_price == stop_loss:
+            reason = "stop_loss"
+
+        # Перенос SL в безубыток
+        elif stop_price == buy_price or trigger_price == buy_price:
+            reason = "stop_loss_breakeven"
+
+        # Тейк-профит
+        elif (
+                avg in take_profits or
+                stop_price in take_profits or
+                tp_price in take_profits
+        ):
+            reason = "take_profit"
+
+        # --- PnL расчёт ---
+        pnl = 0.0
+        if reason in ("take_profit", "stop_loss", "stop_loss_breakeven"):
+            if direction == "long":
+                pnl = (avg - buy_price) * amount
+            else:  # short
+                pnl = (buy_price - avg) * amount
+            total_pnl += pnl
+
+        results.append({
+            # "id": order_id,
+            "side": side,
+            "average": avg,
+            "amount": amount,
+            "classified_as": reason,
+            "pnl": round(pnl, 4),
+        })
+
+    # --- Группировка частичных входов ---
+    if entry_orders:
+        total_amount = sum(float(o.get("amount", 0)) for o in entry_orders)
+        total_cost = sum(float(o.get("amount", 0)) * float(o.get("average", 0)) for o in entry_orders)
+        avg_entry = total_cost / total_amount if total_amount > 0 else 0
+
+        grouped_entry = {
+            "id": [o["id"] for o in entry_orders],
+            "side": entry_orders[0]["side"],
+            "average": round(avg_entry, 6),
+            "amount": total_amount,
+            "classified_as": "entry_grouped",
+            "pnl": 0.0
+        }
+        results.append(grouped_entry)
+
+    # --- ROI (доходность) ---
+    roi = (total_pnl / total_invested * 100) if total_invested > 0 else 0
+
+    # --- Сводка ---
+    summary = {
+        "symbol": signal["symbol"],
+        "direction": direction,
+        "buy_price": buy_price,
+        "realized_pnl": round(total_pnl, 4),
+        "roi_percent": round(roi, 2)
+    }
+
+    return results, summary

@@ -74,6 +74,7 @@ def main():
                 # анализ сделок
                 print(f"Анализ закрытых ордеров {yellow(symbol)}:")
                 for r in orders.analyze_closed_orders(exchange, signal):
+                    # for r in orders.analyze_closed_orders_with_pnl(exchange, signal):
                     print(f"    {r}")
 
                 # Проверяем, был ли такой сигнал

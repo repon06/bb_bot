@@ -3,7 +3,10 @@ import logging
 from pymongo import MongoClient
 
 # Настраиваем логирование
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, handlers=[
+    logging.FileHandler("bot.log", mode="a", encoding="utf-8"),
+    logging.StreamHandler()
+])
 
 
 def get_order_type(symbol, price):

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 import traceback
 from datetime import datetime, timedelta, timezone
@@ -16,6 +17,15 @@ from orders import print_order_info, get_error, check_and_open_long_order, set_l
     check_order_statuses
 from strategy import should_short, should_long
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler("bot.log", mode="a", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
+
 
 def main():
     # Создаем клиента для базы данных 'crypto' и коллекции 'signals' и 'orders'
@@ -25,7 +35,7 @@ def main():
 
     signals_documents = db_client_signals.get_all_documents()
     orders_documents = db_client_orders.get_all_documents()
-    # print(f"Удалено документов: {db_client_signals.delete_many({})}")
+    # logging.info(f"Удалено документов: {db_client_signals.delete_many({})}")
 
     usdt_balance = 0.0
     exchange = get_exchange(API_KEYS, is_demo=IS_DEMO)
@@ -37,9 +47,9 @@ def main():
         balance = exchange.fetch_balance()
         usdt_balance = balance['total']['USDT']
         if usdt_balance > 10:
-            print(f"Есть средства для торговли на балансе: {usdt_balance:.2f} USDT!")
+            logging.info(f"Есть средства для торговли на балансе: {usdt_balance:.2f} USDT!")
     except Exception as e:
-        print("Error:", get_error(e))
+        logging.info("Error:", get_error(e))
 
     # сигнал из файла
     signal_from_file = None  # TODO: пока убрал parse_trade_signals(signals_text)  # from file
@@ -63,41 +73,38 @@ def main():
 
             current_price = exchange.fetch_ticker(symbol, params={"type": "future"})['last']
             signal['current_price'] = current_price
-            print(f"Текущая цена {green(symbol)}: {current_price}, цена входа: {buy_price}")
+            logging.info(f"Текущая цена {green(symbol)}: {current_price}, цена входа: {buy_price}")
 
             symbol = check_symbol_exists(exchange, symbol)
             if symbol:
                 signal['symbol'] = symbol
                 signal['status']: 'found'
-                print(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
+                logging.info(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
 
                 # анализ сделок
-                print(f"Анализ закрытых ордеров {yellow(symbol)}:")
+                logging.info(f"Анализ закрытых ордеров {yellow(symbol)}:")
                 for r in orders.analyze_closed_orders(exchange, signal):
                     # for r in orders.analyze_closed_orders_with_pnl(exchange, signal):
-                    print(f"    {r}")
+                    logging.info(f"    {r}")
 
                 # Проверяем, был ли такой сигнал
-                # existing_signal = db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price, 'direction': trade_type})
                 existing_signal = db_client_signals.find_signal(symbol, buy_price, trade_type)
                 if existing_signal:
                     if orders.check_open_orders(exchange, symbol):
-                        # print(orders.get_pnl(exchange, symbol))
+                        # logging.info(orders.get_pnl(exchange, symbol))
                         # Позиция ещё открыта — двигаем SL и не открываем заново
-                        print(f"Сигнал по {green(symbol)} уже есть в БД и позиция открыта.")
+                        logging.info(f"Сигнал по {green(symbol)} уже есть в БД и позиция открыта.")
                         orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal)
                         continue
                     elif (orders.check_closed_orders(exchange, symbol)
-                          # or db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})):
                           or db_client_signals.find_signal(symbol, buy_price, trade_type)):
-                        print(f"Позиция по {green(symbol)} уже обработана. Пропуск.")
+                        logging.info(f"Позиция по {green(symbol)} уже обработана. Пропуск.")
                         continue
                     else:
                         # Сигнал есть, но позиции нет — можно открывать заново
-                        print(f"Сигнал по {green(symbol)} уже был, но ордеров нет — открываем заново.")
+                        logging.info(f"Сигнал по {green(symbol)} уже был, но ордеров нет — открываем заново.")
                 else:
                     # Если сигнала ещё нет в БД — добавляем
-                    # db_client_signals.insert_one(signal)
                     db_client_signals.insert_signal(signal)
 
                 # Если дошли сюда — можно открывать сделку если свежий сигнал
@@ -106,6 +113,7 @@ def main():
 
                     if order_ids:
                         db_order_id = db_client_orders.insert_order(order_ids)  # save order in db
+
                         order_general = {
                             'order_id': order_ids['order'],
                             'date_time': order_ids['date_time'],
@@ -115,17 +123,19 @@ def main():
                             'parent': None,
                             'price': buy_price
                         }
+
                         order_tps_sl = []
                         for i, tp in enumerate(take_profits):
                             order_tps_sl.append({
                                 'order_id': order_ids['take_profits'][i],
                                 'date_time': order_ids['date_time'],
                                 'symbol': order_ids['symbol'],
-                                'type': 'tp',
+                                'type': 'tp' + i + 1,
                                 'status': 'open',
                                 'parent': order_ids['order'],
                                 'price': tp
                             })
+
                             order_tps_sl.append({
                                 'order_id': order_ids['stop_loss'],
                                 'date_time': order_ids['date_time'],
@@ -135,32 +145,30 @@ def main():
                                 'parent': order_ids['order'],
                                 'price': stop_loss
                             })
+
                         db_orders.insert_many([order_general] + order_tps_sl)
-                        print(
-                            # f"Found order: {db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price})}")  # Поиск сигнала
+                        logging.info(
                             f"Found order: {db_client_signals.find_signal(symbol, buy_price, trade_type)}")  # Поиск сигнала
 
                         statuses = check_order_statuses(exchange, symbol, order_ids)
-                        print("Статусы ордеров:", statuses)
+                        logging.info("Статусы ордеров:", statuses)
                     else:
-                        print("Не удалось открыть сделку.")
+                        logging.info("Не удалось открыть сделку.")
                 else:
-                    print(
+                    logging.info(
                         f"Сигнал старее {TIME_DElTA} мин: {round((datetime.now(timezone.utc) - date).total_seconds() / 60)} мин")
             else:
                 signal['status']: 'not found'
                 symbol = signal['symbol']
-                # if not db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price}):
                 if not db_client_signals.find_signal(symbol, buy_price, trade_type):
-                    # db_client_signals.insert_one(signal)  # add mongo
                     db_client_signals.insert_signal(signal)  # add mongo
             ################################################################
 
     for symbol, market in markets.items():  # for market in markets:
-        # print("limits: " + print_dict(market['limits']))
-        print(f"{red(symbol)} / {market['type']} / "
-              f"limits min: {market['limits']['amount']['min']:.0f} "
-              f"limits max: {market['limits']['amount']['max']:.0f}")
+        # logging.info("limits: " + print_dict(market['limits']))
+        logging.info(f"{red(symbol)} / {market['type']} / "
+                     f"limits min: {market['limits']['amount']['min']:.0f} "
+                     f"limits max: {market['limits']['amount']['max']:.0f}")
         if market['type'] == 'option':
             continue
         # candles = fetch_recent_data(exchange, symbol=symbol, timeframe=TIMEFRAME, start_date="2024-12-09 15:30:00", limit=50)
@@ -178,7 +186,7 @@ def main():
                 print_candles(candles)
                 print_graphic(candles, symbol, stop_loss, take_profit)
 
-                print(f"Тип рынка: {market['type']}")
+                logging.info(f"Тип рынка: {market['type']}")
                 if market['type'] == 'linear':
                     exchange.set_leverage(LEVERAGE, symbol)
                     set_leverage(exchange, symbol, leverage=LEVERAGE)
@@ -198,7 +206,7 @@ def safe_main():
     try:
         main()
     except Exception as e:
-        print(f"[ОШИБКА] main(): {e}")
+        logging.info(f"[ОШИБКА] main(): {e}")
         telegram.send_to_me(f"[ОШИБКА] main(): {e}")
         traceback.print_exc()
 
@@ -211,6 +219,6 @@ if __name__ == "__main__":
         try:
             schedule.run_pending()
         except Exception as e:
-            print(f"[ОШИБКА] schedule.run_pending(): {e}")
+            logging.info(f"[ОШИБКА] schedule.run_pending(): {e}")
             traceback.print_exc()
         time.sleep(1)

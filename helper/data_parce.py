@@ -33,7 +33,7 @@ def parse_trade_signal(signal_text):
         # Ищем название символа (учитываем как форматы с дефисом, так и без)
         symbol_match = re.search(r'#([\w-]+)', signal_text)
         if not symbol_match:
-            raise ValueError("Не удалось найти символ в сигнале.")
+            raise ValueError("Не удалось найти символ в сигнале")
 
         raw_symbol = symbol_match.group(1)
         # Преобразуем символ в формат без "-"
@@ -42,7 +42,7 @@ def parse_trade_signal(signal_text):
         # Ищем цену покупки
         buy_match = re.search(r'Buy:\s+([\d.]+)', signal_text)
         if not buy_match:
-            raise ValueError("Не удалось найти цену покупки.")
+            raise ValueError("Не удалось найти цену покупки")
 
         buy_price = float(buy_match.group(1))
 
@@ -56,7 +56,7 @@ def parse_trade_signal(signal_text):
         # Ищем стоп-лосс
         sl_match = re.search(r'STL:\s+([\d.]+)', signal_text)
         if not sl_match:
-            raise ValueError("Не удалось найти стоп-лосс.")
+            raise ValueError("Не удалось найти стоп-лосс")
 
         stop_loss = float(sl_match.group(1))
 

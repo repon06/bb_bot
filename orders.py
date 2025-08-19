@@ -47,7 +47,7 @@ def open_long_position(exchange, symbol, amount, current_price, take_profits: ar
         set_stop_loss_market(exchange, symbol, stop_loss, amount)
 
         print(f"{green("Открыта") if order is not None else red("Не открыта")} LONG позиция "
-              f"на {symbol} с тейк-профитом и стоп-лоссом.")
+              f"на {symbol} с тейк-профитом и стоп-лоссом")
     return order
 
 
@@ -63,7 +63,7 @@ def open_long_position_old(exchange, symbol, amount, current_price):
     exchange.create_order(symbol, type='stop_loss_limit', side='sell', amount=amount, price=stop_loss,
                           params={'stopPrice': stop_loss})
 
-    print(f"Открыта Long позиция на {symbol} с тейк-профитом и стоп-лоссом.")
+    print(f"Открыта Long позиция на {symbol} с тейк-профитом и стоп-лоссом")
     return order
 
 
@@ -133,11 +133,11 @@ def check_and_open_long_order(exchange, symbol, usdt_balance, take_profits: arra
     if required_amount_in_usdt < 5: required_amount_in_usdt = 5
 
     if usdt_balance < required_amount_in_usdt:
-        print(f"Недостаточно средств для покупки {min_order_qty} {symbol}. Нужно {required_amount_in_usdt:.2f} USDT.")
+        print(f"Недостаточно средств для покупки {min_order_qty} {symbol}. Нужно {required_amount_in_usdt:.2f} USDT")
     else:
         print(
-            f"Для покупки мин кол-ва монет ({min_order_qty}) на рынке {symbol}, нужно потратить: {required_amount_in_usdt:.2f} USDT.")
-        print(f"Доступно для покупки {usdt_balance:.2f} USDT. Ордер можно разместить.")
+            f"Для покупки мин кол-ва монет ({min_order_qty}) на рынке {symbol}, нужно потратить: {required_amount_in_usdt:.2f} USDT")
+        print(f"Доступно для покупки {usdt_balance:.2f} USDT. Ордер можно разместить")
 
     print(f"У меня должно быть usdt: {required_amount_in_usdt:.2f} "
           f"я имею usdt: {usdt_balance} "
@@ -145,7 +145,7 @@ def check_and_open_long_order(exchange, symbol, usdt_balance, take_profits: arra
           f"минимум: {min_order_qty:.2f} ")
 
     if required_amount_in_usdt < min_order_amt:
-        print(f"Минимальная сумма для ордера: {min_order_amt} USDT. Увеличьте сумму.")
+        print(f"Минимальная сумма для ордера: {min_order_amt} USDT. Увеличьте сумму")
         min_amount_in_symbol = min_order_amt / current_price
         min_amount_in_symbol = math.ceil(
             min_amount_in_symbol / min_order_qty) * min_order_qty
@@ -165,7 +165,7 @@ def open_short_position(exchange, symbol, amount, take_profits, stop_loss, lever
     """
     try:
         exchange.set_leverage(leverage, symbol)
-        print(f"Плечо {leverage}x установлено для {symbol}.")
+        print(f"Плечо {leverage}x установлено для {symbol}")
 
         order = exchange.create_market_sell_order(symbol, amount)
         print(f"Рыночный ордер на продажу открыт: {order}")
@@ -313,7 +313,7 @@ def open_long_position_with_tp_sl_OLD(exchange, symbol, leverage, take_profits=N
 
     required_amount_in_usdt = amount * current_price
     if required_amount_in_usdt < min_order_amt:
-        raise ValueError(f"Минимальная сумма сделки: {min_order_amt} USDT. Недостаточно средств.")
+        raise ValueError(f"Минимальная сумма сделки: {min_order_amt} USDT. Недостаточно средств")
 
     print(
         f"Открытие LONG позиции на {symbol} с кол-вом: {amount:.2f}, стоимостью: {required_amount_in_usdt:.2f} USDT, max allowed: {max_order_qty}")
@@ -387,7 +387,7 @@ def check_and_move_to_breakeven(exchange, symbol, entry_price, tp1_price, remain
         last_price = ticker['last']
 
         if last_price >= tp1_price:
-            print(f"Цена достигла TP1 ({tp1_price}). Перемещаем стоп-лосс в безубыток.")
+            print(f"Цена достигла TP1 ({tp1_price}). Перемещаем стоп-лосс в безубыток")
             move_stop_to_breakeven(exchange, symbol, entry_price, remaining_amount)
         else:
             print(f"Цена еще не достигла TP1 ({tp1_price}). Текущая цена: {last_price}")
@@ -415,13 +415,16 @@ def open_perpetual_order_by_signal(exchange, signal):
     trade_type = signal['direction']  # LONG/SHORT
     current_price = signal['current_price']
 
-    open_perpetual_order_id = open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss,
+    open_perpetual_order_id = open_perpetual_order(exchange, market_symbol,
+                                                   buy_price, take_profits, stop_loss,
                                                    trade_type=trade_type, current_price=current_price)
 
     return open_perpetual_order_id
 
 
-def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_loss, trade_type=None,
+def open_perpetual_order(exchange, market_symbol, buy_price,
+                         take_profits, stop_loss,
+                         trade_type=None,
                          current_price=None):
     """
     Открывает фьючерсную (Perpetual) сделку на Bybit с ТП и СЛ.
@@ -470,25 +473,22 @@ def open_perpetual_order(exchange, market_symbol, buy_price, take_profits, stop_
             }
         )
 
-        print(f"Открыт ордер {order['id']}")
+        print(f"Открыт {red(trade_type.upper())} на {order_amount} {green(market_symbol)} по цене {current_price}!")
 
         order_ids = {'symbol': market_symbol, 'order': order['id'], 'take_profits': [], 'stop_loss': None}
 
         # Тейк-профиты
-        tp_order_ids = set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount, take_profits
-                                                  # ,params={"category": "linear"}
-                                                  )
+        tp_order_ids = set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount, take_profits)
         order_ids['take_profits'].extend(tp_order_ids)
 
         # Стоп-лосс
-        # sl_order_id = retry_set_stop_loss(exchange, market_symbol, trade_type, order_amount, stop_loss, params={"category": "linear"})
         sl_order_id = set_stop_loss_perpetual(exchange, market_symbol, trade_type, order_amount, stop_loss)
 
         if sl_order_id:
             order_ids['stop_loss'] = sl_order_id
         else:
             print("СЛ не установлен, закрываю позицию")
-            close_all_orders_and_positions(exchange, market_symbol, trade_type, params={"category": "linear"})
+            close_all_orders_and_positions(exchange, market_symbol, trade_type)
 
         order_ids['date_time'] = datetime.now(timezone.utc)
         return order_ids
@@ -527,16 +527,16 @@ def open_spot_order_with_tps_sl(exchange, market_symbol, buy_price, take_profits
 
         initial_trade_type = determine_trade_type(buy_price, take_profits, stop_loss)
         if not initial_trade_type:
-            print("Не удалось определить начальный тип сделки. Проверьте значения buy_price, take_profits и stop_loss.")
+            print("Не удалось определить начальный тип сделки. Проверьте значения buy_price, take_profits и stop_loss")
             return []
 
         trade_type = determine_trade_type(buy_price, take_profits, stop_loss, current_price)
         if not trade_type:
-            print("Текущая цена изменяет логику сделки, сделка не будет открыта.")
+            print("Текущая цена изменяет логику сделки, сделка не будет открыта")
             return []
 
         if initial_trade_type != trade_type:
-            print(f"Тип сделки изменился: с {initial_trade_type} на {trade_type}. Ордер не будет открыт.")
+            print(f"Тип сделки изменился: с {initial_trade_type} на {trade_type}. Ордер не будет открыт")
             return []
 
         market_info = exchange.market(market_symbol)
@@ -544,11 +544,11 @@ def open_spot_order_with_tps_sl(exchange, market_symbol, buy_price, take_profits
 
         order_amount = TRADE_AMOUNT / current_price
         if order_amount < min_order_size:
-            print(f"Количество ордера {order_amount} меньше минимально допустимого {min_order_size}.")
+            print(f"Количество ордера {order_amount} меньше минимально допустимого {min_order_size}")
             return []
 
         print(
-            f"Открываем {green(initial_trade_type)} ордер на {order_amount:.6f} {market_symbol} по цене {current_price}.")
+            f"Открываем {green(initial_trade_type)} ордер на {order_amount:.6f} {market_symbol} по цене {current_price}")
         order = exchange.create_order(
             symbol=market_symbol,
             type='market',
@@ -572,7 +572,7 @@ def open_spot_order_with_tps_sl(exchange, market_symbol, buy_price, take_profits
             # order_ids.append(sl_order_id)  # Добавляем ID ордера, если стоп-лосс был успешно установлен
             order_ids['stop_loss'] = sl_order_id  # Добавляем ID ордера стоп-лосса
         elif not sl_order_id:
-            print("Стоп-лосс не установлен. Закрываем все позиции и ордера.")
+            print("Стоп-лосс не установлен. Закрываем все позиции и ордера")
             close_all_orders_and_positions(exchange, market_symbol, trade_type)
 
         order_ids['date_time'] = datetime.now(timezone.utc)
@@ -596,7 +596,7 @@ def get_market_type(exchange, symbol):
             print(f"Символ {formatted_symbol} найден. Тип рынка: {market_type}")
             return market_type
         else:
-            print(f"Символ {formatted_symbol} не найден.")
+            print(f"Символ {formatted_symbol} не найден")
             return None
     except Exception as e:
         print(f"Ошибка при проверке символа {symbol}: {e}")
@@ -677,7 +677,7 @@ def check_open_orders(exchange, symbol):
     try:
         open_orders = exchange.fetch_open_orders(symbol)
         if open_orders:
-            print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров.")
+            print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров")
             for open_order in open_orders:
                 _type = open_order['info'].get('stopOrderType', '').lower()
                 # _type = get_order_type(open_order['symbol'], open_order['triggerPrice']) #'stopOrderType'
@@ -685,7 +685,7 @@ def check_open_orders(exchange, symbol):
                     f"    {open_order['id']}: {open_order['type']}, {_type}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
             return True
         else:
-            print(f"Нет открытых ордеров для {symbol}.")
+            print(f"Нет открытых ордеров для {symbol}")
             return False
     except Exception as e:
         print(f"Ошибка при проверке открытых ордеров для {symbol}: {e}")
@@ -705,7 +705,7 @@ def close_all_orders_and_positions(exchange, market_symbol, trade_type):
         open_orders = exchange.fetch_open_orders(market_symbol)
         for order in open_orders:
             exchange.cancel_order(order['id'], market_symbol)
-            print(f"Отменен ордер {order['id']} на {order['price']} {market_symbol}.")
+            print(f"Отменен ордер {order['id']} на {order['price']} {market_symbol}")
 
         position = exchange.fetch_position(market_symbol)
         position_amount = position['amount']
@@ -720,7 +720,7 @@ def close_all_orders_and_positions(exchange, market_symbol, trade_type):
             )
             print(f"Позиция закрыта, ID ордера: {close_order['id']}")
         else:
-            print("Нет открытых позиций для закрытия.")
+            print("Нет открытых позиций для закрытия")
     except Exception as e:
         print(f"Ошибка при закрытии ордеров и позиций: {e}")
 
@@ -777,16 +777,16 @@ def retry_set_stop_loss(exchange, market_symbol, trade_type, order_amount, stop_
         try:
             sl_order_id = set_stop_loss(exchange, market_symbol, trade_type, order_amount, stop_loss)
             if sl_order_id:
-                print(f"Стоп-лосс успешно установлен с ID: {sl_order_id} на попытке {attempt}.")
+                print(f"Стоп-лосс успешно установлен с ID: {sl_order_id} на попытке {attempt}")
                 return sl_order_id
         except Exception as e:
             print(f"Попытка {attempt} установить стоп-лосс не удалась: {e}")
 
         if attempt < max_retries:
-            print(f"Ждем {retry_delay} секунд перед повторной попыткой...")
+            print(f"Ждем {retry_delay} секунд перед повторной попыткой..")
             time.sleep(retry_delay)
 
-    print("Не удалось установить стоп-лосс после всех попыток.")
+    print("Не удалось установить стоп-лосс после всех попыток")
     return None
 
 
@@ -838,7 +838,7 @@ def set_stop_loss(exchange, market_symbol, trade_type, order_amount, stop_loss):
             print(f"Неизвестный тип рынка для {market_symbol}: {market_type}")
             return None
 
-        print(f"Стоп-лосс установлен на {stop_loss}, ID ордера: {sl_order['id']}.")
+        print(f"Стоп-лосс установлен на {stop_loss}, ID ордера: {sl_order['id']}")
         return sl_order['id']
 
     except Exception as sl_error:
@@ -876,7 +876,7 @@ def set_take_profit(exchange, market_symbol, trade_type, order_amount, take_prof
                 }
             )
             order_ids.append(tp_order['id'])
-            print(f"Тейк-профит установлен на {tp}, ID ордера: {tp_order['id']}.")
+            print(f"Тейк-профит установлен на {tp}, ID ордера: {tp_order['id']}")
         except Exception as tp_error:
             print(f"Ошибка при установке тейк-профита на {tp}: {tp_error}")
 
@@ -906,7 +906,7 @@ def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount
                 }
             )
             order_ids.append(tp_order['id'])
-            print(f"Тейк-профит установлен на {tp_price}, ID ордера: {tp_order['id']}.")
+            print(f"Тейк-профит установлен на {tp_price}, ID ордера: {tp_order['id']}")
         except Exception as e:
             print(f"Ошибка при установке тейк-профита на {tp_price}: {e}")
 
@@ -927,7 +927,7 @@ def move_sl_to_break_even(exchange, market_symbol, entry_price, trade_type):
             break
 
     if not first_tp:
-        print("Ни один тейк-профит ещё не сработал.")
+        print("Ни один тейк-профит ещё не сработал")
         return None
 
     # Ставим стоп-лосс в безубыток
@@ -975,7 +975,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
 
         # 3. Если SL уже на цене безубытка — выходим
         if existing_sl and float(existing_sl.get('stopPrice', 0)) == float(buy_price):
-            print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется.")
+            print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется")
             return
 
         # 4. Удаляем старый SL, если он есть
@@ -1103,10 +1103,10 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         # Считаем текущий открытый объем позиции
         remaining_amount = sum(
             float(o['amount']) for o in open_orders if o.get('reduceOnly', False))  # TODO: надо ли вычислять и как?
-        #tp_volume = float(first_tp_order['amount']) if first_tp_order else 0
+        # tp_volume = float(first_tp_order['amount']) if first_tp_order else 0
 
         # Проверяем условие переноса SL
-        if not first_tp_closed: # and remaining_amount >= tp_volume and tp_volume > 0:
+        if not first_tp_closed:  # and remaining_amount >= tp_volume and tp_volume > 0:
             print(
                 f"SL по {symbol} не двигаем: первый TP не сработал и позиция полная (remaining_amount={remaining_amount})")
             return
@@ -1128,7 +1128,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
                                 o.get("takeProfitPrice") == buy_price)), None)
 
         if existing_sl and float(existing_sl.get('stopPrice', 0)) == float(buy_price):
-            print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется.")
+            print(f"SL уже в безубытке ({buy_price}) для {symbol}, перенос не требуется")
             return
 
         # Определяем количество для нового SL
@@ -1205,7 +1205,7 @@ def __auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existi
                 break
 
         if tp_hit_index is None:
-            print(f"По {symbol} ещё не сработал ни один TP — стоп не двигаем.")
+            print(f"По {symbol} ещё не сработал ни один TP — стоп не двигаем")
             return
 
         # Определяем новую цену SL
@@ -1263,7 +1263,7 @@ def check_closed_orders(exchange, symbol, recent_ms=60_000):
         last_closed = sorted(closed_orders, key=lambda o: o['timestamp'])[-1]
         # Можно поставить таймер или проверку условий, чтобы не входить сразу
         if (time.time() * 1000) - last_closed['timestamp'] < recent_ms * 30:
-            print(f"Последняя позиция по {symbol} закрыта недавно, пропуск.")
+            print(f"Последняя позиция по {symbol} закрыта недавно, пропуск")
             return True
     return False
 

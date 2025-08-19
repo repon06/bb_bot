@@ -119,7 +119,7 @@ def check_symbol_exists(exchange, symbol) -> str:
                 # Проверка на наличие символа с постфиксом
                 for market in markets.keys():
                     if market.startswith(formatted_symbol):
-                        print(f"Криптопара {green(symbol)} найдена на Bybit как {market}.")
+                        print(f"Криптопара {green(symbol)} найдена на Bybit как {market}")
                         return market
 
         print(f"Криптопара {red(symbol)} не найдена на Bybit!")
@@ -141,14 +141,14 @@ def check_symbol_exists(exchange, symbol):
             spot_symbol = f"{base}/USDT"  # spot
 
             if perp_symbol in markets:
-                print(f"Криптопара {symbol} найдена как {perp_symbol} (perpetual).")
+                print(f"Криптопара {symbol} найдена как {perp_symbol} (perpetual)")
                 return perp_symbol
 
             if spot_symbol in markets:
-                print(f"Криптопара {symbol} найдена как {spot_symbol} (spot).")
+                print(f"Криптопара {symbol} найдена как {spot_symbol} (spot)")
                 return spot_symbol
 
-        print(f"Криптопара {symbol} не найдена.")
+        print(f"Криптопара {symbol} не найдена")
         return None
     except Exception as e:
         print(f"Ошибка при проверке символа {symbol}: {e}")

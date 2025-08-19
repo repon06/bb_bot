@@ -27,9 +27,9 @@ signal_pattern = (
 async def get_tg_signal(limit=100):
     signals = []
     if os.path.exists(f"{session_name}.session"):
-        logging.info("Сессия найдена, используем сохраненную.")
+        logging.info("Сессия найдена, используем сохраненную")
     else:
-        logging.info("Сессия не найдена, потребуется авторизация.")
+        logging.info("Сессия не найдена, потребуется авторизация")
 
     async with TelegramClient(session_name, tg_api_id, tg_api_hash,
                               system_version='1.38.1',
@@ -65,9 +65,9 @@ async def get_tg_signal(limit=100):
 async def get_tg_signals_from_insider_trade_by_name(tg_channel_insider: str, limit=100):
     signals = []
     if os.path.exists(f"{session_insider_account}.session"):
-        logging.info("Сессия найдена, используем сохраненную.")
+        logging.info("Сессия найдена, используем сохраненную")
     else:
-        logging.info("Сессия не найдена, потребуется авторизация.")
+        logging.info("Сессия не найдена, потребуется авторизация")
 
     async with TelegramClient(session_insider_account, tg_api_id, tg_api_hash,
                               system_version='1.38.1',
@@ -78,9 +78,9 @@ async def get_tg_signals_from_insider_trade_by_name(tg_channel_insider: str, lim
             channel = await client.get_entity(tg_channel_insider)
         except ChannelPrivateError:
             logging.error(
-                "Вы не подписаны на канал или он приватный. Убедитесь, что ваш аккаунт в TelegramClient подписан.")
+                "Вы не подписаны на канал или он приватный. Убедитесь, что ваш аккаунт в TelegramClient подписан")
         except UsernameInvalidError:
-            logging.error("Username канала недействителен. Попробуйте по ID.")
+            logging.error("Username канала недействителен. Попробуйте по ID")
             dialog = await check_and_get_tg_channel(client, tg_channel_insider)
             if dialog:
                 channel = PeerChannel(dialog.id)
@@ -118,9 +118,9 @@ async def get_tg_signals_from_insider_trade_by_name(tg_channel_insider: str, lim
 async def get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id: int, limit=100):
     signals = []
     if os.path.exists(f"{session_insider_account}.session"):
-        logging.info("Сессия найдена, используем сохраненную.")
+        logging.info("Сессия найдена, используем сохраненную")
     else:
-        logging.info("Сессия не найдена, потребуется авторизация.")
+        logging.info("Сессия не найдена, потребуется авторизация")
 
     async with TelegramClient(session_insider_account, tg_api_id, tg_api_hash,
                               system_version='1.38.1',
@@ -171,7 +171,7 @@ async def check_and_get_tg_channel(client: TelegramClient, tg_name_find: str):
 
     channels = [d for d in dialogs if d.is_channel]
     if not channels:
-        logging.info("Каналы не найдены в вашем аккаунте.")
+        logging.info("Каналы не найдены в вашем аккаунте")
         return None
 
     logging.info("\n📋 Найденные каналы:")
@@ -188,7 +188,7 @@ async def check_and_get_tg_channel(client: TelegramClient, tg_name_find: str):
 
 async def send_to_me(message: str):
     if not os.path.exists(f"{session_name}.session"):
-        logging.error("Сессия Telegram не найдена! Сначала авторизуйтесь.")
+        logging.error("Сессия Telegram не найдена! Сначала авторизуйтесь")
         return
 
     async with TelegramClient(session_name, tg_api_id, tg_api_hash) as client:
@@ -197,7 +197,7 @@ async def send_to_me(message: str):
 
 async def save_to_me(message: str):
     if not os.path.exists(f"{session_name}.session"):
-        logging.error("Сессия Telegram не найдена! Сначала авторизуйтесь.")
+        logging.error("Сессия Telegram не найдена! Сначала авторизуйтесь")
         return
 
     async with TelegramClient(session_name, tg_api_id, tg_api_hash) as client:
@@ -208,10 +208,10 @@ if __name__ == "__main__":
     asyncio.run(send_to_me("Привет! Это тестовое сообщение в Избранное 🚀"))
 
     # signals = asyncio.run(get_tg_signal(limit=50))
-    # logging.info(f"1) Получено {len(signals)} сигналов.")
+    # logging.info(f"1) Получено {len(signals)} сигналов")
 
     # signals = asyncio.run(get_tg_signals_from_insider_trade_by_name(tg_channel_insider_name, limit=50))
-    # logging.info(f"2) Получено {len(signals)} сигналов.")
+    # logging.info(f"2) Получено {len(signals)} сигналов")
 
     signals = asyncio.run(get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id, limit=10))
-    logging.info(f"3) Получено {len(signals)} сигналов.")
+    logging.info(f"3) Получено {len(signals)} сигналов")

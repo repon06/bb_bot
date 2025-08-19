@@ -92,21 +92,22 @@ def main():
                     if orders.check_open_orders(exchange, symbol):
                         # logging.info(orders.get_pnl(exchange, symbol))
                         # Позиция ещё открыта — двигаем SL и не открываем заново
-                        logging.info(f"Сигнал по {green(symbol)} уже есть в БД и позиция открыта.")
+                        logging.info(f"Сигнал по {green(symbol)} уже есть в БД и позиция открыта")
                         orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal)
                         continue
                     elif (orders.check_closed_orders(exchange, symbol)
                           or db_client_signals.find_signal(symbol, buy_price, trade_type)):
-                        logging.info(f"Позиция по {green(symbol)} уже обработана. Пропуск.")
+                        logging.info(f"Позиция по {green(symbol)} уже обработана. Пропуск")
                         continue
                     else:
                         # Сигнал есть, но позиции нет — можно открывать заново
-                        logging.info(f"Сигнал по {green(symbol)} уже был, но ордеров нет — открываем заново.")
+                        logging.info(f"Сигнал по {green(symbol)} уже был, но ордеров нет — открываем заново")
                 # else:# Если сигнала ещё нет в БД — добавляем
 
                 # Если дошли сюда — можно открывать сделку если свежий сигнал
                 if date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
+
                     asyncio.run(telegram.send_to_me(
                         f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}"))
                     logging.info(
@@ -156,7 +157,7 @@ def main():
                         statuses = check_order_statuses(exchange, symbol, order_ids)
                         logging.info("Статусы ордеров:", statuses)
                     else:
-                        logging.info("Не удалось открыть сделку.")
+                        logging.info("Не удалось открыть сделку")
                 else:
                     logging.info(
                         f"Сигнал старее {TIME_DElTA} мин: {round((datetime.now(timezone.utc) - date).total_seconds() / 60)} мин")

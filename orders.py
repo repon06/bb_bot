@@ -1122,13 +1122,8 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
             return
 
         # корректируем SL для Bybit
-
-        # if trade_type == 'long':
-        # sl_trigger_price = min(float(buy_price), current_price * 0.999)
-        # sl_trigger_price = buy_price
-        # else:
-        # sl_trigger_price = max(float(buy_price), current_price * 1.001)
-        # sl_trigger_price = buy_price
+        # if trade_type == 'long': sl_trigger_price = min(float(buy_price), current_price * 0.999)
+        # else: sl_trigger_price = max(float(buy_price), current_price * 1.001)
         sl_trigger_price = buy_price
 
         # Округляем цену SL под точность рынка
@@ -1315,3 +1310,82 @@ def get_realized_pnl(exchange, symbol, entry_time):
     except Exception as e:
         print(f"Ошибка получения Realized P&L для {symbol}: {e}")
         return 0.0
+
+
+def analyze_closed_orders(exchange, signal):
+    """
+    Анализирует список закрытых ордеров и классифицирует их:
+    - entry (вход, включая частичные исполнения)
+    - take_profit (тейк-профит)
+    - stop_loss (стоп-лосс)
+    - stop_loss_breakeven (перенос в б/у)
+    """
+    closed_orders = exchange.fetch_closed_orders(symbol=signal["symbol"])
+
+    buy_price = float(signal["buy_price"])
+    take_profits = [float(tp) for tp in signal["take_profits"]]
+    stop_loss = float(signal["stop_loss"])
+
+    entry_orders = []
+    results = []
+
+    for o in closed_orders:
+        # order_id = o.get("id")
+        avg = float(o.get("average") or 0)
+        stop_price = float(o.get("stopPrice") or 0)
+        trigger_price = float(o.get("triggerPrice") or 0)
+        tp_price = float(o.get("takeProfitPrice") or 0)
+        side = o.get("side")
+        status = o.get("status")
+        amount = float(o.get("amount", 0))
+        reason = "unknown"
+
+        # Вход (entry) — совпадает с buy_price ± небольшой дельта
+        if abs(avg - buy_price) < buy_price * 0.002:
+            reason = "entry"
+            entry_orders.append(o)  # собираем все частичные входы
+
+        # Стоп-лосс
+        elif stop_price == stop_loss or trigger_price == stop_loss:
+            reason = "stop_loss"
+
+        # Перенос SL в безубыток
+        elif stop_price == buy_price or trigger_price == buy_price:
+            reason = "stop_loss_breakeven"
+
+        # Тейк-профит
+        elif (
+                avg in take_profits or
+                stop_price in take_profits or
+                tp_price in take_profits
+        ):
+            reason = "take_profit"
+
+        results.append({
+            # "id": order_id,
+            "side": side,
+            "average": avg,
+            "amount": amount,
+            "stopPrice": stop_price,
+            "triggerPrice": trigger_price,
+            "takeProfitPrice": tp_price,
+            "status": status,
+            "classified_as": reason
+        })
+
+    # --- Группировка частичных входов ---
+    if entry_orders:
+        total_amount = sum(float(o.get("amount", 0)) for o in entry_orders)
+        total_cost = sum(float(o.get("amount", 0)) * float(o.get("average", 0)) for o in entry_orders)
+        avg_entry = total_cost / total_amount if total_amount > 0 else 0
+
+        grouped_entry = {
+            "id": [o["id"] for o in entry_orders],
+            "side": entry_orders[0]["side"],
+            "average": round(avg_entry, 6),
+            "amount": total_amount,
+            "classified_as": "entry_grouped"
+        }
+        results.append(grouped_entry)
+
+    return results

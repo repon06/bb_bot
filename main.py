@@ -61,16 +61,20 @@ def main():
             trade_type = signal['direction']  # LONG/SHORT
             date = signal['date']
 
-            ticker = exchange.fetch_ticker(symbol, params={"type": "future"})
-            current_price = ticker['last']
+            current_price = exchange.fetch_ticker(symbol, params={"type": "future"})['last']
             signal['current_price'] = current_price
             print(f"Текущая цена {green(symbol)}: {current_price}, цена входа: {buy_price}")
 
-            symbol = check_symbol_exists(exchange, symbol)  # TODO: надо ли указывать символ пары в таком виде?
+            symbol = check_symbol_exists(exchange, symbol)
             if symbol:
                 signal['symbol'] = symbol
                 signal['status']: 'found'
                 print(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
+
+                # анализ сделок
+                print(f"Анализ закрытых ордеров {yellow(symbol)}:")
+                for r in orders.analyze_closed_orders(exchange, signal):
+                    print(f"    {r}")
 
                 # Проверяем, был ли такой сигнал
                 # existing_signal = db_client_signals.find_one({'symbol': symbol, 'buy_price': buy_price, 'direction': trade_type})

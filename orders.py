@@ -678,9 +678,6 @@ def check_open_orders(exchange, symbol):
         if open_orders:
             print(f"Есть открытые ордера для {green(symbol)}: {yellow(len(open_orders))} ордеров")
             for open_order in open_orders:
-                # _type = open_order['info'].get('stopOrderType', '').lower()
-                #_type = open_order['info'].get('createType', '').lower()
-                # _type = get_order_type(open_order['symbol'], open_order['triggerPrice']) #'stopOrderType'
                 print(
                     f"    {open_order['id']}: {open_order['clientOrderId']}, amount: {open_order['amount']}, price: {open_order['triggerPrice']}")
             return True

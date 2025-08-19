@@ -78,9 +78,10 @@ async def get_tg_signals_from_insider_trade_by_name(tg_channel_insider: str, lim
         try:
             channel = await client.get_entity(tg_channel_insider)
         except ChannelPrivateError:
-            print("Вы не подписаны на канал или он приватный. Убедитесь, что ваш аккаунт в TelegramClient подписан.")
+            logging.error(
+                "Вы не подписаны на канал или он приватный. Убедитесь, что ваш аккаунт в TelegramClient подписан.")
         except UsernameInvalidError:
-            print("Username канала недействителен. Попробуйте по ID.")
+            logging.error("Username канала недействителен. Попробуйте по ID.")
             dialog = await check_and_get_tg_channel(client, tg_channel_insider)
             if dialog:
                 channel = PeerChannel(dialog.id)
@@ -92,7 +93,7 @@ async def get_tg_signals_from_insider_trade_by_name(tg_channel_insider: str, lim
                 message_date = message.date
 
                 if LOGGING:
-                    print(f'{i} ({message_date}): {message_text}')
+                    logging.info(f'{i} ({message_date}): {message_text}')
                 i += 1
 
                 match = re.search(signal_pattern, message_text, re.DOTALL)
@@ -136,7 +137,7 @@ async def get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id: int, li
                 message_date = message.date
 
             if LOGGING:
-                print(f'{i} ({message_date}): {message_text}')
+                logging.info(f'{i} ({message_date}): {message_text}')
             i += 1
 
             match = re.search(signal_pattern, message_text, re.DOTALL)
@@ -171,10 +172,10 @@ async def check_and_get_tg_channel(client: TelegramClient, tg_name_find: str):
 
     channels = [d for d in dialogs if d.is_channel]
     if not channels:
-        print("Каналы не найдены в вашем аккаунте.")
+        logging.info("Каналы не найдены в вашем аккаунте.")
         return None
 
-    print("\n📋 Найденные каналы:")
+    logging.info("\n📋 Найденные каналы:")
     for i, dialog in enumerate(channels):
         line = f"{i + 1}. {dialog.title} (id: {dialog.id})"
         if tg_name_find.lstrip('@') == dialog.title:  # 'Insider_Trade'
@@ -182,7 +183,7 @@ async def check_and_get_tg_channel(client: TelegramClient, tg_name_find: str):
             channel_name = dialog.title
             channel_id = dialog.id
             channel = dialog
-        print(line)
+        logging.info(line)
     return channel
 
 

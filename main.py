@@ -83,6 +83,9 @@ def main():
                 # for r in orders.analyze_closed_orders_with_pnl(exchange, signal):
                 #    logging.info(f"    {r}")
 
+                # смотрим причину закрытия ордера
+                # order = exchange.fetch_order('4493ed53-7556-487b-94dc-21b9c34e65c6', 'THETA/USDT:USDT', params={"acknowledged": True})
+
                 # asyncio.run(telegram.send_to_me(f"ссылка на сигнал: {signal['link']}"))
 
                 # Проверяем, был ли такой сигнал
@@ -108,14 +111,14 @@ def main():
                 if date >= datetime.now(timezone.utc) - timedelta(minutes=TIME_DElTA):
                     order_ids = orders.open_perpetual_order_by_signal(exchange, signal)
 
-                    asyncio.run(telegram.send_to_me(
-                        f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}"))
-                    logging.info(
-                        f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}")
-                    # Если сигнала ещё нет в БД — добавляем
-                    db_client_signals.insert_signal(signal)
-
                     if order_ids:
+                        asyncio.run(telegram.send_to_me(
+                            f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}"))
+                        logging.info(
+                            f"Создан новый ордер по {signal['direction']} сигналу: {signal['symbol']} на цену покупки {signal['buy_price']}")
+
+                        # Если сигнала ещё нет в БД — добавляем
+                        db_client_signals.insert_signal(signal)
                         db_order_id = db_client_orders.insert_order(order_ids)  # save order in db
 
                         order_general = {
@@ -178,7 +181,7 @@ def safe_main():
         main()
     except Exception as e:
         logging.info(f"[ОШИБКА] main(): {e}")
-        telegram.send_to_me(f"[ОШИБКА] main(): {e}")
+        asyncio.run(telegram.send_to_me(f"[ОШИБКА] main(): {e}"))
         traceback.print_exc()
 
 

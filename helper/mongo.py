@@ -6,7 +6,7 @@ logging.getLogger("pymongo").setLevel(logging.WARNING)
 
 
 def get_order_type(symbol, price):
-    open_order = MongoDBClient(db_name='crypto', collection_name='orders_general').find_open_orders(symbol, price)
+    open_order = MongoDBClient(db_name='crypto', collection_name='orders_general').find_open_orders_by_price(symbol, price)
     return open_order['type'] if open_order is not None else None
 
 
@@ -72,8 +72,11 @@ class MongoDBClient:
     def find_signal(self, symbol, buy_price, direction):
         return self._find_one({'symbol': symbol, 'buy_price': buy_price, 'direction': direction})
 
-    def find_open_orders(self, symbol, price):
+    def find_open_orders_by_price(self, symbol, price):
         return self._find_one({'symbol': symbol, 'price': price})
+
+    def find_open_general_orders(self, symbol):
+        return self._find_one({'symbol': symbol, 'type': 'general'})
 
     def insert_signal(self, signal):
         return self._insert_one(signal)

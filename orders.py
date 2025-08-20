@@ -14,6 +14,7 @@ from config import LEVERAGE, TRADE_AMOUNT, IS_DEMO
 from helper.calculate import determine_trade_type
 from helper.design import red, green, yellow
 from helper.json_helper import get_error
+from helper.mongo import MongoDBClient
 
 
 def open_position(exchange, symbol, side, amount):
@@ -456,6 +457,8 @@ def open_perpetual_order(exchange, market_symbol, buy_price,
         if trade_type != determine_trade_type(buy_price, take_profits, stop_loss, current_price):
             logging.info(
                 f"Направление сделки {trade_type} не соответствует текущей цене {current_price} и ТП {take_profits}/СЛ {stop_loss}")
+            asyncio.run(telegram.send_to_me(
+                f"Направление сделки {trade_type} не соответствует текущей цене {current_price} и ТП {take_profits}/СЛ {stop_loss}"))
             return {}
 
         # Получаем минимальный размер ордера
@@ -483,7 +486,7 @@ def open_perpetual_order(exchange, market_symbol, buy_price,
         )
 
         logging.info(
-            f"Открыт {trade_type.upper()} на {order_amount} {market_symbol} по цене {current_price}!\r\n{link}")
+            f"Открыт {trade_type.upper()} на {order_amount} {market_symbol} по цене {current_price}!")
         asyncio.run(telegram.send_to_me(
             f"Открыт {trade_type.upper()} на {order_amount} {market_symbol} по цене {current_price}!\r\n{link}"))
 
@@ -742,7 +745,8 @@ import time
 def set_stop_loss_perpetual(exchange, market_symbol, trade_type, order_amount, stop_loss):
     side = 'sell' if trade_type == 'long' else 'buy'
     # trigger_direction = 'below' if trade_type == 'long' else 'above'
-    trigger_direction = 1 if trade_type == 'long' else 2  # для ТП - наоборот
+    # trigger_direction = 1 if trade_type == 'long' else 2  # для ТП - наоборот
+    trigger_direction = get_trigger_direction(trade_type, 'sl')
 
     try:
         sl_order = exchange.create_order(
@@ -902,7 +906,8 @@ def set_take_profits_perpetual(exchange, market_symbol, trade_type, order_amount
     order_ids = []
     side = 'sell' if trade_type == 'long' else 'buy'
     # trigger_direction = "above" if trade_type == 'long' else "below"
-    trigger_direction = 2 if trade_type == 'long' else 1  # для СЛ - наоборот
+    # trigger_direction = 1 if trade_type == 'long' else 2  # для СЛ - наоборот
+    trigger_direction = get_trigger_direction(trade_type, 'tp')
 
     for idx, tp_price in enumerate(take_profits):
         try:
@@ -1070,6 +1075,13 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
             asyncio.run(telegram.send_to_me(
                 f"Основной ордер {link} {symbol} отсутствует (ликвидация?), TP/SL будут закрыты"))
 
+            # смотрим причину закрытия ордера
+            _closed_order_db = MongoDBClient(db_name='crypto',
+                                             collection_name='orders_general').find_open_general_orders(symbol)
+            _closed_order = exchange.fetch_order(_closed_order_db.get('order_id'), symbol,
+                                                 params={"acknowledged": True})
+            logging.info(f"Закрытый ордер: {_closed_order}")
+
             for order in open_orders:
                 if order.get("reduceOnly", False):
                     exchange.cancel_order(order['id'], symbol)
@@ -1166,7 +1178,8 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         # price_precision = market['precision']['price']
         # sl_trigger_price = round(sl_trigger_price, price_precision)
 
-        trigger_direction = 2 if trade_type == 'long' else 1  # для ТП - наоборот?
+        # trigger_direction = 2 if trade_type == 'long' else 1  # для ТП - наоборот?
+        trigger_direction = get_trigger_direction(trade_type, 'sl')
 
         logging.info(
             f"Создаем новый SL={sl_trigger_price} для {symbol} (buy_price={buy_price}, current_price={current_price})")
@@ -1200,6 +1213,31 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         logging.error(f"Ошибка переноса {trade_type} SL в безубыток для {symbol}: {e}")
         asyncio.run(
             telegram.send_to_me(f"Ошибка переноса {trade_type} SL в безубыток для {symbol} {link}: {e}"))
+
+
+def get_trigger_direction(trade_type: str, order_type: str) -> int:
+    """
+    Возвращает правильный triggerDirection для Bybit.
+
+    :param trade_type: 'long' или 'short'
+    :param order_type: 'sl' (stop-loss) или 'tp' (take-profit)
+    :return: 1 (Rising) или 2 (Falling)
+    """
+    mapping = {
+        "long": {
+            "sl": 2,  # стоп при падении
+            "tp": 1  # тейк при росте
+        },
+        "short": {
+            "sl": 1,  # стоп при росте
+            "tp": 2  # тейк при падении
+        }
+    }
+
+    try:
+        return mapping[trade_type.lower()][order_type.lower()]
+    except KeyError:
+        raise ValueError(f"Некорректные параметры: trade_type={trade_type}, order_type={order_type}")
 
 
 def __auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal, mode="breakeven"):

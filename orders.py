@@ -418,17 +418,20 @@ def open_perpetual_order_by_signal(exchange, signal):
     stop_loss = signal['stop_loss']
     trade_type = signal['direction']  # LONG/SHORT
     current_price = signal['current_price']
+    link = signal['link']
 
     open_order = open_perpetual_order(exchange, market_symbol,
                                       buy_price, take_profits, stop_loss,
-                                      trade_type=trade_type, current_price=current_price)
+                                      trade_type=trade_type, current_price=current_price,
+                                      link=link)
     return open_order
 
 
 def open_perpetual_order(exchange, market_symbol, buy_price,
                          take_profits, stop_loss,
                          trade_type=None,
-                         current_price=None):
+                         current_price=None,
+                         link=None):
     """
     Открывает фьючерсную (Perpetual) сделку на Bybit с ТП и СЛ.
     """
@@ -478,9 +481,9 @@ def open_perpetual_order(exchange, market_symbol, buy_price,
         )
 
         logging.info(
-            f"Открыт {red(trade_type.upper())} на {order_amount} {green(market_symbol)} по цене {current_price}!")
+            f"Открыт {trade_type.upper()} на {order_amount} {market_symbol} по цене {current_price}!\r\n{link}")
         asyncio.run(telegram.send_to_me(
-            f"Открыт {red(trade_type.upper())} на {order_amount} {green(market_symbol)} по цене {current_price}!"))
+            f"Открыт {trade_type.upper()} на {order_amount} {market_symbol} по цене {current_price}!\r\n{link}"))
 
         order_ids = {'symbol': market_symbol, 'order': order['id'], 'take_profits': [], 'stop_loss': None}
 
@@ -502,7 +505,7 @@ def open_perpetual_order(exchange, market_symbol, buy_price,
 
     except Exception as e:
         logging.error(f"Ошибка открытия {market_symbol} фьючерсной сделки: {e}")
-        asyncio.run(telegram.send_to_me(f"Ошибка открытия {market_symbol} фьючерсной сделки: {e}"))
+        asyncio.run(telegram.send_to_me(f"Ошибка открытия {link} {market_symbol} фьючерсной сделки: {e}"))
         return {}
 
 
@@ -1035,7 +1038,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type):
         logging.error(f"Ошибка переноса SL в безубыток для {symbol}: {e}")
 
 
-def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal):
+def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal, link=None):
     """
     Авто-перенос SL в безубыток после первого срабатывшего TP.
     SL двигается только если первый TP сработал или оставшийся объем позиции меньше объема одного TP.
@@ -1062,7 +1065,8 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         if not main_order:
             # Основного ордера нет — закрываем все TP и SL
             logging.info(f"Основной ордер {symbol} отсутствует (ликвидация?), TP/SL будут закрыты")
-            asyncio.run(telegram.send_to_me(f"Основной ордер {symbol} отсутствует (ликвидация?), TP/SL будут закрыты"))
+            asyncio.run(telegram.send_to_me(
+                f"Основной ордер {link} {symbol} отсутствует (ликвидация?), TP/SL будут закрыты"))
 
             for order in open_orders:
                 if order.get("reduceOnly", False):
@@ -1160,6 +1164,10 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         # price_precision = market['precision']['price']
         # sl_trigger_price = round(sl_trigger_price, price_precision)
 
+        trigger_direction = 2 if trade_type == 'long' else 1  # для ТП - наоборот?
+
+        logging.info(
+            f"Создаем новый SL={sl_trigger_price} для {symbol} (buy_price={buy_price}, current_price={current_price})")
         # Создаём новый SL
         new_sl = exchange.create_order(
             symbol=symbol,
@@ -1169,6 +1177,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
             params={
                 'stopLossPrice': sl_trigger_price,
                 'stopPrice': sl_trigger_price,
+                'triggerDirection': trigger_direction,  # 1=long, 2=short
                 'reduceOnly': True,
                 'orderLinkId': f"SL_{symbol.replace('/USDT:USDT', '')}_{uuid.uuid4().hex[:6]}"
             }
@@ -1182,12 +1191,13 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         logging.info(
             f"Стоп перенесён в безубыток: SL={sl_trigger_price} (buy_price={buy_price}, current_price={current_price}), ID={new_sl['id']}")
         asyncio.run(
-            telegram.send_to_me(f"Сдвинули SL в безубыток по {trade_type} сигналу: {symbol} на {sl_trigger_price}"))
+            telegram.send_to_me(
+                f"Сдвинули SL в безубыток по {trade_type} сигналу {link}: {symbol} на {sl_trigger_price}"))
 
     except Exception as e:
         logging.error(f"Ошибка переноса {trade_type} SL в безубыток для {symbol}: {e}")
         asyncio.run(
-            telegram.send_to_me(f"Ошибка переноса {trade_type} SL в безубыток для {symbol}: {e}"))
+            telegram.send_to_me(f"Ошибка переноса {trade_type} SL в безубыток для {symbol} {link}: {e}"))
 
 
 def __auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal, mode="breakeven"):

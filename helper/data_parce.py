@@ -66,7 +66,8 @@ def parse_trade_signal(signal_text):
             'take_profits': take_profits,
             'stop_loss': stop_loss,
             'direction': determine_trade_type(buy_price, take_profits, stop_loss),
-            'date': datetime.now().date()
+            'date': datetime.now().date(),
+            'link': None
         }
 
     except Exception as e:

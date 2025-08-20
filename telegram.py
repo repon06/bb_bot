@@ -54,7 +54,8 @@ async def get_tg_signal(limit=100):
                     'buy_price': buy_price,
                     'take_profits': take_profits,
                     'stop_loss': stop_loss,
-                    'date': message_date
+                    'date': message_date,
+                    'link': f"https://t.me/{tg_channel_name}/{message.id}"  # приватный ли канал?
                 }
                 signals.append(signal_data)
                 # logging.info(f"Новый сигнал: {signal_data}")
@@ -108,7 +109,8 @@ async def get_tg_signals_from_insider_trade_by_name(tg_channel_insider: str, lim
                         'buy_price': buy_price,
                         'take_profits': take_profits,
                         'stop_loss': stop_loss,
-                        'date': message_date
+                        'date': message_date,
+                        'link': f"https://t.me/c/{str(tg_channel_insider_id).replace('-100', '')}/{message.id}"
                     }
                     signals.append(signal_data)
                     # logging.info(f"Новый сигнал: {signal_data}")
@@ -153,7 +155,8 @@ async def get_tg_signals_from_insider_trade_by_id(tg_channel_insider_id: int, li
                     'take_profits': take_profits,
                     'stop_loss': stop_loss,
                     'direction': direction,
-                    'date': message_date
+                    'date': message_date,
+                    'link': f"https://t.me/c/{str(tg_channel_insider_id).replace('-100', '')}/{message.id}"
                 }
                 signals.append(signal_data)
                 # logging.info(f"Новый сигнал: {signal_data}")

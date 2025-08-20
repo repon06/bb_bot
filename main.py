@@ -69,6 +69,7 @@ def main():
             stop_loss = signal['stop_loss']
             trade_type = signal['direction']  # LONG/SHORT
             date = signal['date']
+            link = signal['link']
 
             current_price = exchange.fetch_ticker(symbol, params={"type": "future"})['last']
             signal['current_price'] = current_price
@@ -86,6 +87,8 @@ def main():
                 # for r in orders.analyze_closed_orders_with_pnl(exchange, signal):
                 #    logging.info(f"    {r}")
 
+                #asyncio.run(telegram.send_to_me(f"ссылка на сигнал: {signal['link']}"))
+
                 # Проверяем, был ли такой сигнал
                 existing_signal = db_client_signals.find_signal(symbol, buy_price, trade_type)
                 if existing_signal:
@@ -93,7 +96,7 @@ def main():
                         # logging.info(orders.get_pnl(exchange, symbol))
                         # Позиция ещё открыта — двигаем SL и не открываем заново
                         logging.info(f"Сигнал по {symbol} уже есть в БД и позиция открыта")
-                        orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal)
+                        orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal,link)
                         continue
                     elif (orders.check_closed_orders(exchange, symbol)
                           or db_client_signals.find_signal(symbol, buy_price, trade_type)):

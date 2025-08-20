@@ -10,7 +10,7 @@ import orders
 import telegram
 from config import API_KEYS, IS_DEMO, TIMEFRAME, LEVERAGE, TIME_DElTA, tg_channel_insider_id, LAST_MESSAGE_COUNT
 from data_fetcher import get_exchange, fetch_recent_data, check_symbol_exists
-from helper.design import red, print_graphic, print_candles, green, yellow
+from helper.design import print_graphic, print_candles  # ,red, green, yellow
 from helper.mongo import MongoDBClient
 from indicators import calculate_indicators, get_current_price
 from orders import print_order_info, get_error, check_and_open_long_order, set_leverage, is_market_order_open, \
@@ -72,13 +72,13 @@ def main():
 
             current_price = exchange.fetch_ticker(symbol, params={"type": "future"})['last']
             signal['current_price'] = current_price
-            logging.info(f"Текущая цена {green(symbol)}: {current_price}, цена входа: {buy_price}")
+            logging.info(f"Текущая цена {symbol}: {current_price}, цена входа: {buy_price}")
 
             symbol = check_symbol_exists(exchange, symbol)
             if symbol:
                 signal['symbol'] = symbol
                 # signal['status']: 'found'
-                logging.info(f"Криптопара {green(symbol)} найдена на Bybit в формате: {yellow(symbol)}")
+                logging.info(f"Криптопара {symbol} найдена на Bybit в формате: {symbol}")
 
                 # анализ сделок TODO: пока отключил
                 # logging.info(f"Анализ закрытых ордеров {yellow(symbol)}:")
@@ -92,16 +92,16 @@ def main():
                     if orders.check_open_orders(exchange, symbol):
                         # logging.info(orders.get_pnl(exchange, symbol))
                         # Позиция ещё открыта — двигаем SL и не открываем заново
-                        logging.info(f"Сигнал по {green(symbol)} уже есть в БД и позиция открыта")
+                        logging.info(f"Сигнал по {symbol} уже есть в БД и позиция открыта")
                         orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal)
                         continue
                     elif (orders.check_closed_orders(exchange, symbol)
                           or db_client_signals.find_signal(symbol, buy_price, trade_type)):
-                        logging.info(f"Позиция по {green(symbol)} уже обработана. Пропуск")
+                        logging.info(f"Позиция по {symbol} уже обработана. Пропуск")
                         continue
                     else:
                         # Сигнал есть, но позиции нет — можно открывать заново
-                        logging.info(f"Сигнал по {green(symbol)} уже был, но ордеров нет — открываем заново")
+                        logging.info(f"Сигнал по {symbol} уже был, но ордеров нет — открываем заново")
                 # else:# Если сигнала ещё нет в БД — добавляем
 
                 # Если дошли сюда — можно открывать сделку если свежий сигнал
@@ -170,7 +170,7 @@ def main():
 
     for symbol, market in markets.items():  # for market in markets:
         # logging.info("limits: " + print_dict(market['limits']))
-        logging.info(f"{red(symbol)} / {market['type']} / "
+        logging.info(f"{symbol} / {market['type']} / "
                      f"limits min: {market['limits']['amount']['min']:.0f} "
                      f"limits max: {market['limits']['amount']['max']:.0f}")
         if market['type'] == 'option':

@@ -98,18 +98,17 @@ def set_stop_loss_market(exchange, symbol, stop_price, amount):
 
 def set_leverage(exchange, symbol, leverage):
     """
-    Устанавливает плечо для заданного символа.
+    Устанавливает плечо для заданного символа на линейных USDT фьючерсах.
     """
-    market = exchange.market(symbol)
-    if 'linear' in market['type']:
-        exchange.private_post_private_linear_position_set_leverage({
-            'symbol': market['id'],
-            'buy_leverage': leverage,
-            'sell_leverage': leverage
-        })
-        exchange.options['leverage'] = LEVERAGE
-    else:
-        logging.info(f"Leverage setting not supported for {symbol}")
+    try:
+        market = exchange.market(symbol)
+        if 'linear' in market['type']:
+            exchange.set_leverage(leverage, symbol, params={"category": "linear"})
+            logging.info(f"Плечо {leverage}x установлено для {symbol}")
+        else:
+            logging.info(f"Плечо не поддерживается для {symbol}")
+    except Exception as e:
+        logging.error(f"Ошибка при установке плеча для {symbol}: {e}")
 
 
 def print_order_info(exchange, order_id, symbol):
@@ -197,6 +196,7 @@ def open_short_position(exchange, symbol, amount, take_profits, stop_loss, lever
         logging.error(f"Ошибка при открытии короткой позиции: {e}")
 
 
+@deprecated()
 def open_long_position_with_tp_sl(exchange, symbol, leverage, take_profits=None, stop_loss=None):
     current_price = exchange.fetch_ticker(symbol)['last']
     usdt_balance = exchange.fetch_balance()['USDT']['free']
@@ -444,6 +444,8 @@ def open_perpetual_order(exchange, market_symbol, buy_price,
         # ticker = exchange.fetch_ticker(market_symbol, params={"type": "future"})
         # current_price = ticker['last']
         # logging.info(f"Текущая цена {market_symbol}: {current_price}, цена входа: {buy_price}")
+
+        set_leverage(exchange, market_symbol, LEVERAGE)
 
         if trade_type is None:
             trade_type = determine_trade_type(buy_price, take_profits, stop_loss, current_price)

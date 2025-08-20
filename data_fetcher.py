@@ -3,7 +3,7 @@ from typing import Optional
 
 import ccxt
 
-from config import IS_DEMO, LOGGING, DELTA, LEVERAGE, SYMBOLS, debug_enable
+from config import IS_DEMO, LOGGING, DELTA, SYMBOLS, debug_enable
 from helper.calculate import calculate_support_resistance, \
     calculate_take_profit_using_resistance, calculate_ema_take_profit, calculate_take_profit_using_atr, \
     calculate_fibonacci_levels, calculate_dynamic_take_profit, calculate_combined_take_profits, calculate_volatility, \
@@ -12,7 +12,6 @@ from helper.date_helper import to_timestamp
 from helper.design import green, yellow, red
 from helper.json_helper import print_info
 from indicators import calculate_indicators
-from orders import open_long_position_with_tp_sl
 
 
 def get_exchange(api_keys, is_demo=False):
@@ -195,4 +194,4 @@ def test_open_long_swap(exchange, symbol):
     stop_loss2 = calculate_trailing_long_stop_loss(current_price, trailing_percentage)
     print(f"Trailing Stop Loss: {stop_loss2:.2f}")
     ################################################################
-    open_long_position_with_tp_sl(exchange, symbol, LEVERAGE, take_profit7, stop_loss2)
+    # open_long_position_with_tp_sl(exchange, symbol, LEVERAGE, take_profit7, stop_loss2)

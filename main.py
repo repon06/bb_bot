@@ -8,14 +8,10 @@ import schedule
 
 import orders
 import telegram
-from config import API_KEYS, IS_DEMO, TIMEFRAME, LEVERAGE, TIME_DElTA, tg_channel_insider_id, LAST_MESSAGE_COUNT
-from data_fetcher import get_exchange, fetch_recent_data, check_symbol_exists
-from helper.design import print_graphic, print_candles  # ,red, green, yellow
+from config import API_KEYS, IS_DEMO, TIME_DElTA, tg_channel_insider_id, LAST_MESSAGE_COUNT
+from data_fetcher import get_exchange, check_symbol_exists
 from helper.mongo import MongoDBClient
-from indicators import calculate_indicators, get_current_price
-from orders import print_order_info, get_error, check_and_open_long_order, set_leverage, is_market_order_open, \
-    check_order_statuses
-from strategy import should_short, should_long
+from orders import get_error, check_order_statuses
 
 logging.basicConfig(
     level=logging.INFO,
@@ -87,7 +83,7 @@ def main():
                 # for r in orders.analyze_closed_orders_with_pnl(exchange, signal):
                 #    logging.info(f"    {r}")
 
-                #asyncio.run(telegram.send_to_me(f"ссылка на сигнал: {signal['link']}"))
+                # asyncio.run(telegram.send_to_me(f"ссылка на сигнал: {signal['link']}"))
 
                 # Проверяем, был ли такой сигнал
                 existing_signal = db_client_signals.find_signal(symbol, buy_price, trade_type)
@@ -96,7 +92,8 @@ def main():
                         # logging.info(orders.get_pnl(exchange, symbol))
                         # Позиция ещё открыта — двигаем SL и не открываем заново
                         logging.info(f"Сигнал по {symbol} уже есть в БД и позиция открыта")
-                        orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal,link)
+                        orders.auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing_signal,
+                                                          link)
                         continue
                     elif (orders.check_closed_orders(exchange, symbol)
                           or db_client_signals.find_signal(symbol, buy_price, trade_type)):
@@ -170,39 +167,6 @@ def main():
                 if not db_client_signals.find_signal(symbol, buy_price, trade_type):
                     db_client_signals.insert_signal(signal)  # add mongo
             ################################################################
-
-    for symbol, market in markets.items():  # for market in markets:
-        # logging.info("limits: " + print_dict(market['limits']))
-        logging.info(f"{symbol} / {market['type']} / "
-                     f"limits min: {market['limits']['amount']['min']:.0f} "
-                     f"limits max: {market['limits']['amount']['max']:.0f}")
-        if market['type'] == 'option':
-            continue
-        # candles = fetch_recent_data(exchange, symbol=symbol, timeframe=TIMEFRAME, start_date="2024-12-09 15:30:00", limit=50)
-        candles = fetch_recent_data(exchange, symbol, TIMEFRAME, limit=50)
-        # Рассчитать все индикаторы
-        df = calculate_indicators(candles)
-        if should_long(df) or should_short(df):
-            if should_long(df):
-                # Получаем текущую цену
-                current_price = get_current_price(df)
-                # Вычисление уровней тейк-профита и стоп-лосса
-                take_profit = [current_price * 1.01, current_price * 1.03, current_price * 1.07]
-                stop_loss = current_price * 0.97  # 0.965
-
-                print_candles(candles)
-                print_graphic(candles, symbol, stop_loss, take_profit)
-
-                logging.info(f"Тип рынка: {market['type']}")
-                if market['type'] == 'linear':
-                    exchange.set_leverage(LEVERAGE, symbol)
-                    set_leverage(exchange, symbol, leverage=LEVERAGE)
-
-                if not is_market_order_open(exchange, symbol):
-                    # Открытие long позиции с расчетными параметрами
-                    order = check_and_open_long_order(exchange, symbol, usdt_balance, take_profit, stop_loss)
-                    if order is not None:
-                        print_order_info(exchange, order['id'], symbol)
 
     # Закрываем соединение
     db_client_signals.close()

@@ -143,9 +143,9 @@ def check_symbol_exists(exchange, symbol):
                 print(f"Криптопара {symbol} найдена как {perp_symbol} (perpetual)")
                 return perp_symbol
 
-            if spot_symbol in markets:
-                print(f"Криптопара {symbol} найдена как {spot_symbol} (spot)")
-                return spot_symbol
+            #if spot_symbol in markets:
+            #    print(f"Криптопара {symbol} найдена как {spot_symbol} (spot)")
+            #    return spot_symbol
 
         print(f"Криптопара {symbol} не найдена")
         return None
@@ -153,6 +153,44 @@ def check_symbol_exists(exchange, symbol):
         print(f"Ошибка при проверке символа {symbol}: {e}")
         return None
 
+def check_symbol_exists(exchange, symbol: str) -> str | None:
+    """
+    Проверяет наличие криптопары на Bybit.
+    Приоритет — perpetual (USDT:USDT), если нет — spot.
+    """
+    try:
+        markets = exchange.load_markets()
+
+        if symbol.endswith("USDT"):
+            base = symbol[:-4]
+
+            # ищем все варианты для этой базы
+            candidates = [m for m in markets.keys() if m.startswith(f"{base}/USDT")]
+            if not candidates:
+                print(f"Криптопара {symbol} не найдена.")
+                return None
+
+            # сначала проверяем perpetual
+            for c in candidates:
+                if ":USDT" in c and markets[c].get("active", True):
+                    print(f"Криптопара {symbol} найдена как {c} (perpetual)")
+                    return c
+
+            # если нет perpetual — пробуем spot
+            #for c in candidates:
+            #    if ":USDT" not in c and markets[c].get("active", True):
+            #        print(f"Криптопара {symbol} найдена как {c} (spot)")
+            #        return c
+
+            print(f"Криптопара {symbol} найдена, но все рынки не активны: {candidates}")
+            return None
+
+        print(f"Криптопара {symbol} не в формате *USDT")
+        return None
+
+    except Exception as e:
+        print(f"Ошибка при проверке символа {symbol}: {e}")
+        return None
 
 def load_open_swap_order(exchange, symbol):
     return exchange.fetch_open_orders(symbol=symbol)

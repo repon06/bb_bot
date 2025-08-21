@@ -143,16 +143,17 @@ def main():
                                 'price': tp
                             })
 
-                            order_tps_sl.append({
-                                'order_id': order_ids['stop_loss'],
-                                'date_time': order_ids['date_time'],
-                                'symbol': order_ids['symbol'],
-                                'type': 'sl',
-                                'status': 'open',
-                                'parent': order_ids['order'],
-                                'price': stop_loss
-                            })
+                        order_tps_sl.append({
+                            'order_id': order_ids['stop_loss'],
+                            'date_time': order_ids['date_time'],
+                            'symbol': order_ids['symbol'],
+                            'type': 'sl',
+                            'status': 'open',
+                            'parent': order_ids['order'],
+                            'price': stop_loss
+                        })
 
+                        # новый ордер в бд order_general
                         db_orders.insert_many([order_general] + order_tps_sl)
                         logging.info(
                             f"Found order: {db_client_signals.find_signal(symbol, buy_price, trade_type)}")  # Поиск сигнала

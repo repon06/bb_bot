@@ -1082,6 +1082,9 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
                                                  params={"acknowledged": True})
             logging.info(f"Закрытый ордер: {_closed_order}")
 
+            # обновляем статус ордера в бд
+            MongoDBClient(db_name='crypto', collection_name='orders_general').set_state_orders(symbol, 'CLOSED?')
+
             for order in open_orders:
                 if order.get("reduceOnly", False):
                     exchange.cancel_order(order['id'], symbol)
@@ -1201,13 +1204,27 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         # Удаляем старый SL, если существует. И удаляем после создания нового СЛ - тк если упадет при создании, то старый не удалится
         if existing_sl:
             exchange.cancel_order(existing_sl['id'], symbol=symbol)
+            MongoDBClient(db_name='crypto', collection_name='orders_general').set_state_sl(symbol, 'CLOSED?')
             logging.info(f"Удалён старый SL ({existing_sl.get('stopPrice')}) для {symbol}")
+
+        # новый ордер в бд order_general
+        order_tps_sl = []
+        order_tps_sl.append({
+            'order_id': new_sl['id'],
+            'date_time': datetime.now(timezone.utc),
+            'symbol': symbol,
+            'type': 'sl',
+            'status': 'open',
+            'parent': None,
+            'price': sl_trigger_price
+        })
+        MongoDBClient(db_name='crypto', collection_name='orders_general').insert_many(order_tps_sl)
 
         logging.info(
             f"Стоп перенесён в безубыток: SL={sl_trigger_price} (buy_price={buy_price}, current_price={current_price}), ID={new_sl['id']}")
         asyncio.run(
             telegram.send_to_me(
-                f"Сдвинули SL в безубыток по {trade_type} сигналу {link}: {symbol} на {sl_trigger_price}"))
+                f"Сдвинули SL в безубыток по {trade_type} сигналу {link}: {symbol} с {sl_price} на {sl_trigger_price}"))
 
     except Exception as e:
         logging.error(f"Ошибка переноса {trade_type} SL в безубыток для {symbol}: {e}")

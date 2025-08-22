@@ -174,6 +174,7 @@ def check_symbol_exists(exchange, symbol: str) -> str | None:
             for c in candidates:
                 if ":USDT" in c and markets[c].get("active", True):
                     print(f"Криптопара {symbol} найдена как {c} (perpetual)")
+                    print(f"Криптопара {c} лимиты плеча: {markets[c]['limits']['leverage']}")
                     return c
 
             # если нет perpetual — пробуем spot

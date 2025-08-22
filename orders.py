@@ -103,11 +103,12 @@ def set_leverage(exchange, symbol, leverage):
     """
     try:
         market = exchange.market(symbol)
-        if 'linear' in market['type']:
+        category = market['info'].get('category')  # 'linear', 'inverse', 'spot'
+        if category == 'linear':
             exchange.set_leverage(leverage, symbol, params={"category": "linear"})
             logging.info(f"Плечо {leverage}x установлено для {symbol}")
         else:
-            logging.info(f"Плечо не поддерживается для {symbol}")
+            logging.info(f"Плечо не поддерживается для {symbol} ({category})")
     except Exception as e:
         logging.error(f"Ошибка при установке плеча для {symbol}: {e}")
 

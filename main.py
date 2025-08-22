@@ -5,6 +5,7 @@ import traceback
 from datetime import datetime, timedelta, timezone
 
 import schedule
+from ccxt import BadSymbol
 
 import orders
 import telegram
@@ -67,7 +68,12 @@ def main():
             date = signal['date']
             link = signal['link']
 
-            current_price = exchange.fetch_ticker(symbol, params={"type": "future"})['last']
+            try:
+                current_price = exchange.fetch_ticker(symbol, params={"type": "future"})['last']
+            except BadSymbol as e:
+                logging.error(f"Ошибка получения инфы по криптопаре: {e}")
+                continue
+
             signal['current_price'] = current_price
             logging.info(f"Текущая цена {symbol}: {current_price}, цена входа: {buy_price}")
 

@@ -11,8 +11,9 @@ import orders
 import telegram
 from config import API_KEYS, IS_DEMO, TIME_DElTA, tg_channel_insider_id, LAST_MESSAGE_COUNT
 from data_fetcher import get_exchange, check_symbol_exists
+from helper.json_helper import get_error
 from helper.mongo import MongoDBClient
-from orders import get_error, check_order_statuses
+from orders import check_order_statuses
 
 logging.basicConfig(
     level=logging.INFO,

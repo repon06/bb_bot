@@ -104,3 +104,6 @@ class MongoDBClient:
             {'symbol': symbol, 'price': price, 'type': 'tp'},
             {"$set": update_data}
         )
+
+    def get_sl(self, symbol):
+        return self._find_one({'symbol': symbol, 'type': 'sl', 'status': 'open'})

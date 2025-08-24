@@ -2,6 +2,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import ccxt
 
@@ -379,9 +380,41 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         tp_side = 'sell' if trade_type == 'long' else 'buy'
         sl_side = 'sell' if trade_type == 'long' else 'buy'
 
+        # точность рынка - для сумм округления
+        market = exchange.market(symbol)
+        price_precision = market['precision']['price']  # точность цены - кол-во символов
+        price_precision = get_price_precision(market)  # точность цены - кол-во символов
+
         # Получаем открытые и закрытые ордера
         open_orders = exchange.fetch_open_orders(symbol=symbol)
         closed_orders = exchange.fetch_closed_orders(symbol=symbol)
+
+        # проверить наличие закрытого СЛ среди закрытых
+        sl_id = MongoDBClient(db_name='crypto', collection_name='orders_general').get_sl(symbol)
+        sl_is_closed = any(
+            o['id'] == sl_id['order_id'] and o['status'] == 'closed'
+            for o in closed_orders
+        )
+        open_tps_numb = [o['clientOrderId'][:-7]
+                         for o in open_orders if 'clientOrderId' in o]  # открытые ТП
+        open_sl_numb = [o['clientOrderId'][:-7]
+                        for o in open_orders if 'clientOrderId' in o and 'SL_' in o['clientOrderId']]  # открытые ТП
+
+        #open_sl_ = [o for o in open_orders if 'clientOrderId' in o and 'SL_' in o['clientOrderId']]  # открытые ТП
+        open_sl = next(
+            (o for o in open_orders
+             if 'SL_' in o.get('clientOrderId', '') and round(buy_price, price_precision) == o.get('stopPrice')),
+            None  # значение по умолчанию, если ничего не найдено
+        )
+        if open_sl:
+            logging.info(f"сигнал уже в безубытке - 1тп прошел, сл = цене входа")
+            return  # дальше перенос SL не нужен
+
+        if sl_is_closed:
+            logging.info(
+                f"SL {symbol} на {sl_price}? закрыт, основной ордер должен быть исчезнуть, остались открытыми ТП: {open_tps_numb}")
+            asyncio.run(telegram.send_to_me(
+                f"SL {symbol} на {sl_price}? закрыт, основной ордер должен быть исчезнуть, остались открытыми ТП: {open_tps_numb}"))
 
         # Проверяем наличие основного ордера (по цене входа и направлению)
         # основного ордера не бывает в fetch_open_orders, там только СЛ/ТП
@@ -457,6 +490,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         remaining_amount = sum(
             float(o['amount']) for o in open_orders if o.get('reduceOnly', False))  # TODO: надо ли вычислять и как?
         # tp_volume = float(first_tp_order['amount']) if first_tp_order else 0
+        remaining_amount = main_order['contracts']
 
         # Проверяем условие переноса SL
         if not first_tp_closed:  # and remaining_amount >= tp_volume and tp_volume > 0:
@@ -496,9 +530,7 @@ def auto_move_sl_to_break_even(exchange, symbol, buy_price, trade_type, existing
         sl_trigger_price = buy_price
 
         # Округляем цену SL под точность рынка
-        # market = exchange.market(symbol)
-        # price_precision = market['precision']['price']
-        # sl_trigger_price = round(sl_trigger_price, price_precision)
+        sl_trigger_price = round(sl_trigger_price, price_precision)
 
         # trigger_direction = 2 if trade_type == 'long' else 1  # для ТП - наоборот?
         trigger_direction = get_trigger_direction(trade_type, 'sl')
@@ -574,6 +606,12 @@ def get_trigger_direction(trade_type: str, order_type: str) -> int:
         return mapping[trade_type.lower()][order_type.lower()]
     except KeyError:
         raise ValueError(f"Некорректные параметры: trade_type={trade_type}, order_type={order_type}")
+
+
+def get_price_precision(market):
+    step = market['precision']['price']
+    d = Decimal(str(step))
+    return max(-d.as_tuple().exponent, 0)
 
 
 def check_closed_orders(exchange, symbol, recent_ms=60_000):

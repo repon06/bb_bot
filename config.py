@@ -42,7 +42,7 @@ DELTA = 6  # за сколько брать данные - до
 
 LAST_MESSAGE_COUNT = 15  # сколько последних сообщ чекать из ТГ канала
 TIME_DElTA = 1200  # мин, сигнал за эту дельту не рассматривать
-TRADE_AMOUNT = 1000  # Сумма для покупки в USDT
+TRADE_AMOUNT = 5000  # Сумма для покупки в USDT
 
 
 def debug_enable(exchange, value: bool):

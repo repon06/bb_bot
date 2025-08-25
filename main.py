@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 import time
 import traceback
 from datetime import datetime, timedelta, timezone
@@ -15,13 +16,18 @@ from helper.json_helper import get_error
 from helper.mongo import MongoDBClient
 from orders import check_order_statuses
 
+os.makedirs("logs", exist_ok=True)
+today = datetime.now().strftime("%Y-%m-%d")
+log_filename = f"logs/bot_{today}.log"
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("bot.log", mode="a", encoding="utf-8"),
+        logging.FileHandler(log_filename, mode="a", encoding="utf-8"),
         logging.StreamHandler()
-    ])
+    ]
+)
 
 
 def main():
